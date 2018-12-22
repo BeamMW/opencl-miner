@@ -1,14 +1,17 @@
 # Beam Equihash 150/5 OpenCL Miner
 
+```
 Copyright 2018 The Beam Team
-
 Copyright 2018 Wilke Trei 
+```
 
 
 # Usage
 ## One Liner Examples
+```
 Linux: ./beamMiner --server <hostName>:<portNumer> --key <apiKey> --devices <deviceList>
 Windows: ./beamMiner --server <hostName>:<portNumer> --key <apiKey> --devices <deviceList>
+```
 
 ## Parameters
 ### --server 
