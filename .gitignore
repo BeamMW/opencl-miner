@@ -1,0 +1,5 @@
+*.o
+*.lib
+*.a
+beamMiner
+beamMiner.exe
