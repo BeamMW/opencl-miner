@@ -290,6 +290,16 @@ void CompressArray(const unsigned char* in, size_t in_len,
 	}
 }
 
+#ifdef WIN32
+
+inline uint32_t htobe32(uint32_t x)
+{
+    return (((x & 0xff000000U) >> 24) | ((x & 0x00ff0000U) >> 8) |
+        ((x & 0x0000ff00U) << 8) | ((x & 0x000000ffU) << 24));
+}
+
+
+#endif // WIN32
 
 // Big-endian so that lexicographic array comparison is equivalent to integer comparison
 void EhIndexToArray(const uint32_t i, unsigned char* array) {

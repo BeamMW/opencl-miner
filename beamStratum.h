@@ -9,6 +9,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <deque>
 #include <random>
 
 #include <boost/scoped_ptr.hpp>

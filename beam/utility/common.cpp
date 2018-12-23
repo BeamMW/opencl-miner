@@ -51,7 +51,7 @@ namespace beam
 		if (nVal > 1)
 		{
 			sRet.resize(nVal - 1);
-			MultiByteToWideChar(CP_UTF8, 0, sz, -1, sRet.data(), nVal);
+			MultiByteToWideChar(CP_UTF8, 0, sz, -1, &sRet[0], nVal);
 		}
 
 		return sRet;
