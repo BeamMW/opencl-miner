@@ -303,7 +303,7 @@ inline uint32_t htobe32(uint32_t x)
 
 // Big-endian so that lexicographic array comparison is equivalent to integer comparison
 void EhIndexToArray(const uint32_t i, unsigned char* array) {
-	static_assert(sizeof(uint32_t) == 4);
+	static_assert(sizeof(uint32_t) == 4, "");
 	uint32_t bei = htobe32(i);
 	memcpy(array, &bei, sizeof(uint32_t));
 }
