@@ -2,13 +2,14 @@
 // Stratum interface class
 // Copyright 2018 The Beam Team	
 // Copyright 2018 Wilke Trei
+#pragma once
+#include "minerBridge.h"
 
 #include <iostream>
 #include <thread>
 #include <cstdlib>
 #include <string>
 #include <sstream>
-#include <vector>
 #include <deque>
 #include <random>
 
@@ -34,7 +35,7 @@ namespace beamMiner {
 #ifndef beamMiner_H 
 #define beamMiner_H 
 
-class beamStratum {
+class beamStratum : public minerBridge {
 	private:
 
 	// Definitions belonging to the physical connection
@@ -79,13 +80,13 @@ class beamStratum {
 	void testAndSubmit(int64_t, uint64_t, std::vector<uint32_t>);
 
 	public:
-	beamStratum(string, string, string, bool);
+    beamStratum(string, string, string, bool);
 	void startWorking();
 
-	bool hasWork();
-	void getWork(int64_t*, uint64_t*, uint8_t*);
+	bool hasWork() override;
+	void getWork(int64_t*, uint64_t*, uint8_t*) override;
 
-	void handleSolution(int64_t&, uint64_t&, std::vector<uint32_t>&);
+	void handleSolution(int64_t&, uint64_t&, std::vector<uint32_t>&) override;
 	
 };
 

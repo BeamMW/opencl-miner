@@ -4,8 +4,17 @@
 // Copyright 2018 Wilke Trei
 
 #include "clHost.h"
+#include <thread>
+#include <iostream>
+#include <cstdlib>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include "equihash_150_5.inc"
 
 namespace beamMiner {
+
+using namespace std;
 
 // Helper functions to split a string
 inline vector<string> &split(const string &s, char delim, vector<string> &elems) {
@@ -52,6 +61,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl) {
 
 	// reading the kernel file
 	cl_int err;
+	/*
 	ifstream file("./equihash_150_5.cl");
 	if (!file.is_open()) {
 		cout << "Error: Kernel file not found!" << endl;
@@ -60,6 +70,9 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl) {
 
 	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>()));
 	cl::Program::Sources source(1,std::make_pair(progStr.c_str(), progStr.length()+1));
+	 */
+
+	cl::Program::Sources source(1,std::make_pair((const char*)equihash_150_5_cl, equihash_150_5_cl_len));
 
 	// Create a program object and build it
 	vector<cl::Device> devicesTMP;
@@ -188,8 +201,8 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 
 
 // Setup function called from outside
-void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCPU) {
-	stratum = stratumIn;
+void clHost::setup(minerBridge* br, vector<int32_t> devSel,  bool allowCPU) {
+	bridge = br;
 	detectPlatFormDevices(devSel, allowCPU);
 }
 
@@ -201,7 +214,7 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 	cl_ulong nonce;
 
 	// Get a new set of work from the stratum interface
-	stratum->getWork(&id,(uint64_t *) &nonce, (uint8_t *) &work);
+	bridge->getWork(&id,(uint64_t *) &nonce, (uint8_t *) &work);
 
 	workData->workId = id;
 	workData->nonce = (uint64_t) nonce;
@@ -279,13 +292,13 @@ void clHost::callbackFunc(cl_int err , void* data){
 		indexes.assign(32,0);
 		memcpy(indexes.data(), &results[gpu][4 + 32*i], sizeof(uint32_t) * 32);
 
-		stratum->handleSolution(workInfo->workId,workInfo->nonce,indexes);  
+		bridge->handleSolution(workInfo->workId,workInfo->nonce,indexes);
 	}
 
 	solutionCnt[gpu] += solutions;
 
 	// Get new work and resume working
-	if (stratum->hasWork()) {
+	if (bridge->hasWork()) {
 		queues[gpu].enqueueUnmapMemObject(buffers[gpu][6], results[gpu], NULL, NULL);
 		queueKernels(gpu, &currentWork[gpu]);
 		results[gpu] = (unsigned *) queues[gpu].enqueueMapBuffer(buffers[gpu][6], CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint4) * 81, NULL, &events[gpu], NULL);
@@ -330,7 +343,7 @@ void clHost::startMining() {
 
 		// Check if there are paused devices and restart them
 		for (int i=0; i<devices.size(); i++) {
-			if (paused[i] && stratum->hasWork()) {
+			if (paused[i] && bridge->hasWork()) {
 				paused[i] = false;
 				
 				// Same as above

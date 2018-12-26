@@ -2,6 +2,8 @@
 // OpenCL Host Interface
 // Copyright 2018 The Beam Team	
 // Copyright 2018 Wilke Trei
+#pragma once
+#include "minerBridge.h"
 
 #include <CL/cl.hpp>
 #include <iostream>
@@ -13,9 +15,9 @@
 #include <cstdlib>
 #include <climits>
 
-#include "beamStratum.h"
-
 namespace beamMiner {
+
+using std::vector;
 
 struct clCallbackData {
 	void* host;
@@ -54,11 +56,11 @@ class clHost {
 	void queueKernels(uint32_t, clCallbackData*);
 	
 	// The connector
-	beamStratum* stratum;
+	minerBridge* bridge;
 
 	public:
 	
-	void setup(beamStratum*, vector<int32_t>, bool);
+	void setup(minerBridge*, vector<int32_t>, bool);
 	void startMining();	
 	void callbackFunc(cl_int, void*);
 };
