@@ -19,7 +19,7 @@ __kernel void clearCounter (
 	This function swaps the order of bits in each byte from low to high endian.
 	This is required for having the xor bits in right order 
 */
-inline uint swapByteEndian(uint input) {
+inline uint swapBitOrder(uint input) {
 	uint tmp0 = input & 0x0F0F0F0F;
 	uint tmp1 = input & 0xF0F0F0F0;
 
@@ -296,11 +296,31 @@ __kernel void round0(
 	uint pos;
 	uint bucket;
 
-	output.s0 = swapByteEndian(v[0] & 0xFFFFFFFF); 				// First element are bytes 0 to 18 
-	output.s1 = swapByteEndian(v[0] >> 32); 
-	output.s2 = swapByteEndian(v[1] & 0xFFFFFFFF); 
-	output.s3 = swapByteEndian(v[1] >> 32); 
-	output.s4 = swapByteEndian(v[2]) & 0x3FFFFF; 	  			// Only lower 22 bits  
+	__local uint dataShare[4096];						// prepare for pipeline change
+
+	uint lId = get_local_id(0);
+
+	for (uint i=0; i<8; i++) {
+		dataShare[16*lId+2*i+0] = v[i] ; 
+		dataShare[16*lId+2*i+1] = v[i] >> 32; 		
+	}									// Now all data of the block is shared
+	
+	barrier(CLK_LOCAL_MEM_FENCE); 						// Barrier is only needed for CPU mining, can be removed on modern GPUs
+		
+	uint v2[15];								// Only need first 15 words
+	uint start = lId & 0xF0; 						// Get rid of lower 4 bit
+
+	for (uint i=0; i<15; i++) {
+		v2[i] = 0;
+		for (uint j = start; j<=lId; j++) v2[i] += dataShare[16*j + i];
+		v2[i] = swapBitOrder(v2[i]);
+	}				
+
+	output.s0 = v2[0]; 							// First element are bytes 0 to 18 
+	output.s1 = v2[1];
+	output.s2 = v2[2]; 
+	output.s3 = v2[3];
+	output.s4 = v2[4] & 0x3FFFFF;  	  					// Only lower 22 bits  
 	output.s5 = (tId << 1) + tId; 
 	/*
 	  	We will sort the element into 2^13 
@@ -313,12 +333,13 @@ __kernel void round0(
 	outputLo[bucket*8672+pos] = output.lo;
 	outputHi[bucket*8672+pos] = output.s45;
 
-				
-	output.s0 = swapByteEndian((v[2] >> 24) & 0xFFFFFFFF); 			// Second element are bytes 19 to 37 
-	output.s1 = swapByteEndian((v[2] >> 56) | ((v[3] & 0xFFFFFF) << 8)); 
-	output.s2 = swapByteEndian((v[3] >> 24) & 0xFFFFFFFF); 
-	output.s3 = swapByteEndian((v[3] >> 56) | ((v[4] & 0xFFFFFF) << 8)); 
-	output.s4 = swapByteEndian((v[4] >> 24)) & 0x3FFFFF;  			// Only lower 22 bits 
+		
+		
+	output.s0 = (v2[4] >> 24) | (v2[5] << 8); 				// Second element are bytes 19 to 37 
+	output.s1 = (v2[5] >> 24) | (v2[6] << 8);
+	output.s2 = (v2[6] >> 24) | (v2[7] << 8);
+	output.s3 = (v2[7] >> 24) | (v2[8] << 8);
+	output.s4 = ((v2[8] >> 24) | (v2[9] << 8)) & 0x3FFFFF;			// Only lower 22 bits 
 	output.s5++; 
 
 	bucket = output.s0 & 0x1FFF;				
@@ -329,13 +350,13 @@ __kernel void round0(
 	outputHi[bucket*8672+pos] = output.s45;
 
 
-	output.s0 = swapByteEndian((v[4] >> 48) | ((v[5] & 0xFFFF) << 16)); 	// Third element are bytes 38 to 56
-	output.s1 = swapByteEndian((v[5] >> 16) & 0xFFFFFFFF); 
-	output.s2 = swapByteEndian((v[5] >> 48) | ((v[6] & 0xFFFF) << 16)); 
-	output.s3 = swapByteEndian((v[6] >> 16) & 0xFFFFFFFF);
-	output.s4 = swapByteEndian((v[6] >> 48) | ((v[7] & 0xFFFF) << 16)) & 0x3FFFFF;	// Only lower 22 bits 
-	output.s5++; 
 
+	output.s0 = (v2[9] >> 16) | (v2[10] << 16);  				// Third element are bytes 38 to 56
+	output.s1 = (v2[10] >> 16) | (v2[11] << 16);
+	output.s2 = (v2[11] >> 16) | (v2[12] << 16);
+	output.s3 = (v2[12] >> 16) | (v2[13] << 16);
+	output.s4 = ((v2[13] >> 16) | (v2[14] << 16)) & 0x3FFFFF;		// Only lower 22 bits 
+	output.s5++; 
 
 	bucket = output.s0 & 0x1FFF;				
 	pos = atomic_inc(&counters[bucket]);
@@ -1116,8 +1137,6 @@ __kernel __attribute__((reqd_work_group_size(16, 1, 1))) void combine (				// Co
 
 				tmp.s3 |= (tmp.s2 << 4);
 				tmp.s3 *= 8672;
-
-				if (abs((int) tmp.s0 - (int) tmp.s1) >= 8672) printf("Alert: %d %d \n", tmp.s0, tmp.s1);
 				
 				scratch1[2*lId]   = tmp.s0 + tmp.s3;	
 				scratch1[2*lId+1] = tmp.s1 + tmp.s3;	
