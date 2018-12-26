@@ -4,43 +4,43 @@ git:
 matrix:
   include:
 
-###############################################################################
-# OSX Debug
-###############################################################################
+# ###############################################################################
+# # OSX Debug
+# ###############################################################################
 
-    - os: osx
-      language: cpp
-      osx_image: xcode9.3
-      before_install: 
-        - export TZ=Etc/GMT-3
-        - brew unlink cmake
-        - brew unlink boost 
-        - brew install cmake boost
-        - export OPENSSL_ROOT_DIR="/usr/local/opt/openssl"
-      env: 
-        - BUILD_TYPE=Debug
-        - OS_FOLDER=mac
-      script:
-        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4;
+#     - os: osx
+#       language: cpp
+#       osx_image: xcode9.3
+#       before_install: 
+#         - export TZ=Etc/GMT-3
+#         - brew unlink cmake
+#         - brew unlink boost 
+#         - brew install cmake boost
+#         - export OPENSSL_ROOT_DIR="/usr/local/opt/openssl"
+#       env: 
+#         - BUILD_TYPE=Debug
+#         - OS_FOLDER=mac
+#       script:
+#         - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4;
         
-###############################################################################
-# OSX Release
-###############################################################################
+# ###############################################################################
+# # OSX Release
+# ###############################################################################
 
-    - os: osx
-      language: cpp
-      osx_image: xcode9.3
-      before_install:
-        - export TZ=Etc/GMT-3
-        - brew unlink cmake
-        - brew unlink boost 
-        - brew install cmake boost
-        - export OPENSSL_ROOT_DIR="/usr/local/opt/openssl"
-      env: 
-        - BUILD_TYPE=Release
-        - OS_FOLDER=mac
-      script:
-        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE  . && make -j 4;
+#     - os: osx
+#       language: cpp
+#       osx_image: xcode9.3
+#       before_install:
+#         - export TZ=Etc/GMT-3
+#         - brew unlink cmake
+#         - brew unlink boost 
+#         - brew install cmake boost
+#         - export OPENSSL_ROOT_DIR="/usr/local/opt/openssl"
+#       env: 
+#         - BUILD_TYPE=Release
+#         - OS_FOLDER=mac
+#       script:
+#         - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE  . && make -j 4;
 
 ###############################################################################
 # Linux Debug
