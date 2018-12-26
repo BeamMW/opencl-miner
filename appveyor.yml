@@ -1,0 +1,46 @@
+version: '{build}'
+image: Visual Studio 2017
+
+environment:
+  #BOOST_ROOT: C:\Libraries\boost_1_67_0
+  #OPENSSL_ROOT_DIR: c:\beam-libs\openssl
+  #QT5_ROOT_DIR: c:\beam-libs\qt5-static-win
+  #QML_IMPORT_PATH: c:\beam-libs\qt5-static-win\qml
+  BUILD_SERVER:
+    secure: l9RqB2YbSnNIKZqTwnd67BHAXvbjmpj9zcf+YQPi9zfzsVeSysaoLD7gy4gSMjWurk2JVHjRpviw4bBxUbu2sA==
+  BUILD_CONFIG: RelWithDebInfo
+  matrix:
+  - arch: Win64
+
+before_build:
+  - cmd: appveyor DownloadFile https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda_10.0.130_411.31_win10 -FileName cuda.exe    
+  - cmd: cuda.exe -s nvcc_10.0 nvprune_10.0 cublas_dev_10.0 cufft_dev_10.0 curand_dev_10.0 cusolver_dev_10.0 cusparse_dev_10.0 nvgraph_dev_10.0 npp_dev_10.0 nvrtc_dev_10.0 nvml_dev_10.0
+  - cmd: set PATH=%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v10.0\bin;%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v10.0\libnvvp;%PATH%
+  #- cmd: git clone --depth=1 https://github.com/BeamMW/libs.git c:/beam-libs
+  #- cmd: git clone --depth=1 https://github.com/nesbox/qt5-static-win.git c:/beam-libs/qt5-static-win
+  - cmd: cmake -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=%BUILD_CONFIG%
+
+build_script:
+  - cmake --build . --parallel --config %BUILD_CONFIG%
+
+on_success:
+- ps: $env:DATE=[TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, "Belarus Standard Time").ToString('yyyy.MM.dd')
+- ps: $env:TIME=[TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, "Belarus Standard Time").ToString('HH:mm:ss')
+- cmd: >-
+
+    git rev-list HEAD --count > BEAM_VERSION_REVISION
+
+    set /p BEAM_VERSION_REVISION=<BEAM_VERSION_REVISION
+
+    set BEAM_VERSION=1.0.%BEAM_VERSION_REVISION%
+
+    7z a c:/projects/opencl-miner/%BUILD_CONFIG%/opencl-miner-%BEAM_VERSION%.zip c:/projects/opencl-miner/%BUILD_CONFIG%/beamMiner.exe c:/projects/opencl-miner/equihash_150_5.cl
+
+    set BUILDS_SERVER_PATH=%BUILD_SERVER%/files/%APPVEYOR_REPO_BRANCH%/%DATE%/Release/win
+
+    curl --retry 3 --ftp-create-dirs -T "c:/projects/opencl-miner/%BUILD_CONFIG%/opencl-miner-%BEAM_VERSION%.zip" %BUILDS_SERVER_PATH%/    
+
+notifications:
+  - provider: Email
+    to:
+      - big.romanov@gmail.com
