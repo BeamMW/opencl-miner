@@ -16,6 +16,10 @@ if (WIN32)
     endif()
 endif()
 
+if (Boost_FOUND)
+    find_package(Boost COMPONENTS system date_time regex thread)
+endif()
+
 find_package(OpenSSL REQUIRED)
 
 if( OpenSSL_FOUND )
