@@ -21,7 +21,7 @@ inline vector<string> split(const string &s, char delim) {
     return split(s, delim, elems);
 }
 
-uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, vector<int32_t> &devices ) {
+uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, bool &cpuMine, vector<int32_t> &devices ) {
 	bool hostSet = false;
 	bool apiSet = false;
 	
@@ -63,6 +63,10 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 				}
 			}
 
+			if (args[i].compare("--enable-cpu")  == 0) {
+				cpuMine = true;
+			}
+
 			if (args[i].compare("--debug")  == 0) {
 				debug = true;
 			}
@@ -90,10 +94,11 @@ int main(int argc, char* argv[]) {
 	string port;
 	string apiCred;
 	bool debug = false;
+	bool cpuMine = false;
 	bool useTLS = true;
 	vector<int32_t> devices;
 
-	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, devices);
+	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices);
 
 	if (parsing != 0) {
 		if (parsing & 0x1) {
@@ -108,8 +113,8 @@ int main(int argc, char* argv[]) {
 		cout << " --help / -h 			Showing this message" << endl;
 		cout << " --server <server>:<port>	The BEAM stratum server and port to connect to (required)" << endl;
 		cout << " --key <key>			The BEAM stratum server API key (required)" << endl;
-		cout << " --devices <number>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
-		cout << " --debug			Enable debug features (optional, default: off)" << endl;
+		cout << " --devices <numbers>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
+		cout << " --enable-cpu			Enable mining on OpenCL CPU devices" << endl;
 		exit(0);
 	}
 
@@ -121,7 +126,7 @@ int main(int argc, char* argv[]) {
 	cout << "Setup OpenCL devices:" << endl;
 	cout << "=====================" << endl;
 	
-	myClHost.setup(&myStratum, devices, false);
+	myClHost.setup(&myStratum, devices, cpuMine);
 
 	cout << endl;
 	cout << "Waiting for work from stratum:" << endl;
