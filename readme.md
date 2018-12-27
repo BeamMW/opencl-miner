@@ -28,3 +28,6 @@ For example to mine on GPUs 0,1 and 3 but not number 2 use --devices 0,1,3
 To list all devices that are present in the system and get their order start the miner with --devices -2 .
 Then all devices will be listed, but none selected for mining. The miner closes when no devices were 
 selected for mining or all selected miner fail in the compatibility check.
+
+# Build status
+[![Build Status](https://travis-ci.org/BeamMW/opencl-miner.svg?branch=master)](https://travis-ci.org/BeamMW/opencl-miner)
