@@ -4,7 +4,7 @@ set(TARGET_NAME beamMiner)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system date_time regex thread)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
@@ -95,4 +95,7 @@ target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/bea
 
 target_link_libraries(${TARGET_NAME} OpenCL::OpenCL)
 
+
+
 target_link_libraries(${TARGET_NAME} ${OPENSSL_LIBSSL} ${OPENSSL_LIBCRYPTO})
+target_link_libraries(${TARGET_NAME} ${Boost_LIBRARIES})
