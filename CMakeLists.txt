@@ -4,11 +4,11 @@ set(TARGET_NAME beamMiner)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost REQUIRED COMPONENTS system date_time regex thread)
+
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
-
+find_package(Boost REQUIRED COMPONENTS system date_time regex thread)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   link_directories(${Boost_LIBRARY_DIRS})
@@ -29,38 +29,15 @@ if (MSVC)
 
 endif()
 
-
-find_package(OpenSSL REQUIRED)
-
-if( OpenSSL_FOUND )
-    set(OPENSSL_USE_STATIC_LIBS TRUE)
+set(OPENSSL_USE_STATIC_LIBS ON)
+set(OPENSSL_MSVC_STATIC_RT ON)
+find_package(OPENSSL REQUIRED)
+if( OPENSSL_FOUND )
     link_directories(${OPENSSL_LIBRARIES})
     include_directories(${OPENSSL_INCLUDE_DIR})
     message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
-    set(OPENSSL_LIBCRYPTO OpenSSL::Crypto)
-    set(OPENSSL_LIBSSL OpenSSL::SSL)
 else()
     message(FATAL_ERROR "error, OpenSSL not found, please install: 'apt-get install libssl-dev' on Ubuntu")
-endif()
-
-if(MSVC)
-    include_directories($ENV{OPENSSL_ROOT_DIR}/include)
-endif()
-
-# cmake can't find static lib on macos, harcoded
-if(APPLE)
-    set(OPENSSL_LIBCRYPTO $ENV{OPENSSL_ROOT_DIR}/lib/libcrypto.a)
-    set(OPENSSL_LIBSSL $ENV{OPENSSL_ROOT_DIR}/lib/libssl.a)
-elseif(UNIX)
-    set(OPENSSL_LIBCRYPTO /usr/lib/x86_64-linux-gnu/libcrypto.a)
-    set(OPENSSL_LIBSSL /usr/lib/x86_64-linux-gnu/libssl.a)
-elseif(MSVC)
-    set(OPENSSL_LIBCRYPTO $ENV{OPENSSL_ROOT_DIR}/lib/VC/static/libcrypto64MT.lib crypt32.lib)
-    set(OPENSSL_LIBSSL $ENV{OPENSSL_ROOT_DIR}/lib/VC/static/libssl64MT.lib)
-
-    if(MSVC_VERSION GREATER_EQUAL 1900)
-        set(OPENSSL_LIBCRYPTO ${OPENSSL_LIBCRYPTO} legacy_stdio_definitions.lib)
-    endif()
 endif()
 
 find_package(OpenCL REQUIRED)
@@ -72,12 +49,10 @@ else()
     message(FATAL_ERROR "error, OpenCL not found")
 endif()
 
-
 set (HEADERS
     beam/utility/common.h
     beam/core/difficulty.h
 )
-
 
 set(MINER_SRC
     beamStratum.cpp
@@ -93,9 +68,13 @@ add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
 
+if(MSVC)
+    target_link_libraries(${TARGET_NAME} crypt32.lib)
+    if(MSVC_VERSION GREATER_EQUAL 1900)
+        target_link_libraries(${TARGET_NAME} legacy_stdio_definitions.lib)
+    endif()
+endif()
+
 target_link_libraries(${TARGET_NAME} OpenCL::OpenCL)
-
-
-
-target_link_libraries(${TARGET_NAME} ${OPENSSL_LIBSSL} ${OPENSSL_LIBCRYPTO})
+target_link_libraries(${TARGET_NAME} ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(${TARGET_NAME} ${Boost_LIBRARIES})
