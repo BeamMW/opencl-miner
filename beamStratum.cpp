@@ -375,7 +375,14 @@ void beamStratum::handleSolution(int64_t &workId, uint64_t &nonce, vector<uint32
 }
 
 
-beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::sslv23)  {
+beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tls)  {
+
+	context.set_options(	  boost::asio::ssl::context::default_workarounds
+				| boost::asio::ssl::context::no_sslv2
+                		| boost::asio::ssl::context::no_sslv3
+				| boost::asio::ssl::context::no_tlsv1
+				| boost::asio::ssl::context::single_dh_use);
+
 	host = hostIn;
 	port = portIn;
 	apiKey = apiKeyIn;
