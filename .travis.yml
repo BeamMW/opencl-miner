@@ -54,7 +54,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - g++-7
-            - libboost-all-dev
+            - libboost-all-dev=1.65.1
             - libssl-dev
             - curl
       before_install:
