@@ -48,13 +48,14 @@ matrix:
 
     - os: linux
       language: cpp
+      dist: xenial
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
           packages:
             - g++-7
-            - libboost1.65-dev
+            - libboost-all-dev
             - libssl-dev
             - curl
       before_install:
@@ -75,13 +76,14 @@ matrix:
 
     - os: linux
       language: cpp
+      dist: xenial
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
           packages:
             - g++-7
-            - libboost1.65-dev
+            - libboost-all-dev
             - libssl-dev
             - curl
             - libxi-dev
