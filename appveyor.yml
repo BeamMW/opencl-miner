@@ -36,7 +36,7 @@ after_build:
 
     7z a c:/projects/opencl-miner/%BUILD_CONFIG%/opencl-miner-%BEAM_VERSION%.zip c:/projects/opencl-miner/%BUILD_CONFIG%/beamMiner.exe c:/projects/opencl-miner/equihash_150_5.cl
     
-    copy c:\projects\opencl-miner\%BUILD_CONFIG%\opencl-miner-%BEAM_VERSION%.zip c:\projects\opencl-miner-%BEAM_VERSION%.zip
+    copy c:\projects\opencl-miner\%BUILD_CONFIG%\opencl-miner-%BEAM_VERSION%.zip c:\projects\opencl-miner\opencl-miner-%BEAM_VERSION%.zip
 
 
 on_success:
