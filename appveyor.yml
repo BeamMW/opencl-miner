@@ -58,7 +58,7 @@ artifacts:
   - path: opencl-miner-%BEAM_VERSION%.zip
     name: OpenCLMiner
 
-eploy:
+deploy:
   provider: S3
   access_key_id:
     secure: J8+/d4TSbhxiaFlDQopFzKbfLPvUy1rMUJlAgnfbBNE=
