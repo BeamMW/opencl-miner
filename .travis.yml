@@ -48,6 +48,7 @@ matrix:
 
     - os: linux
       language: cpp
+      dist: xenial
       addons:
         apt:
           sources:
@@ -75,6 +76,7 @@ matrix:
 
     - os: linux
       language: cpp
+      dist: xenial
       addons:
         apt:
           sources:
