@@ -64,14 +64,14 @@ selected for mining or all selected miner fail in the compatibility check.
   sudo sh cmake-3.12.0-Linux-x86_64.sh --skip-license --prefix=/usr
 ```
 5. Go to beam-opencl-miner project folder and call `cmake -DCMAKE_BUILD_TYPE=Release . && make -j4`.
-6. You'll find beam-opencl-miner binary in `bin` folder.
+6. You'll find _beam-opencl-miner_ binary in `bin` folder.
 
 ## Mac
 1. Install Brew Package Manager.
 1. Installed necessary packages using `brew install openssl boost cmake` command.
 1. Add `export OPENSSL_ROOT_DIR="/usr/local/opt/openssl"` to the _Environment Variables_.
 1. Go to beam-opencl-miner project folder and call `cmake -DCMAKE_BUILD_TYPE=Release . && make -j4`.
-1. You'll find beam-opencl-miner binary in `bin` folder.
+1. You'll find _beam-opencl-miner_ binary in `bin` folder.
 
 
 # Build status
