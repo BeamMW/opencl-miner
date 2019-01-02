@@ -226,15 +226,12 @@ void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCP
 
 // Function that will catch new work from the stratum interface and then queue the work on the device
 void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
-	int64_t id;
 	cl_ulong4 work;	
 	cl_ulong nonce;
 
 	// Get a new set of work from the stratum interface
-	stratum->getWork(&id,(uint64_t *) &nonce, (uint8_t *) &work);
-
-	workData->workId = id;
-	workData->nonce = (uint64_t) nonce;
+	stratum->getWork(workData->wd, (uint8_t *) &work);
+	nonce = workData->wd.nonce;
 
 	if (!is3G[gpuIndex]) {		// Starting the 4G kernels
 		// Kernel arguments for cleanCounter
@@ -384,7 +381,7 @@ void clHost::callbackFunc(cl_int err , void* data){
 		indexes.assign(32,0);
 		memcpy(indexes.data(), &results[gpu][4 + 32*i], sizeof(uint32_t) * 32);
 
-		stratum->handleSolution(workInfo->workId,workInfo->nonce,indexes);  
+		stratum->handleSolution(workInfo->wd,indexes);
 	}
 
 	solutionCnt[gpu] += solutions;

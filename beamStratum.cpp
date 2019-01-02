@@ -247,13 +247,12 @@ bool beamStratum::hasWork() {
 
 
 // function the clHost class uses to fetch new work
-void beamStratum::getWork(int64_t* workOut, uint64_t* nonceOut, uint8_t* dataOut) {
-	*workOut = workId;
+void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 
 	// nonce is atomic, so every time we call this will get a nonce increased by one
-	*nonceOut = nonce.fetch_add(1);
+	wd.nonce = nonce.fetch_add(1);
 
-	uint8_t* noncePoint = (uint8_t*) nonceOut;
+	uint8_t* noncePoint = (uint8_t*) wd.nonce;
 
 	uint32_t poolNonceBytes = min<uint32_t>(poolNonce.size(), 8);
 	for (uint32_t i=0; i<poolNonce.size(); i++) {
@@ -261,8 +260,11 @@ void beamStratum::getWork(int64_t* workOut, uint64_t* nonceOut, uint8_t* dataOut
 	}
 	
 	updateMutex.lock();
-	*workOut = workId;
+
+	wd.workId = workId;
+	wd.powDiff = powDiff;
 	memcpy(dataOut, serverWork.data(), 32);
+
 	updateMutex.unlock();
 }
 
@@ -345,11 +347,7 @@ std::vector<unsigned char> GetMinimalFromIndices(std::vector<uint32_t> indices, 
 	return ret;
 }
 
-bool beamStratum::testSolution(int64_t wId, uint64_t nonceIn, const vector<uint32_t>& indices, vector<uint8_t>& compressed) {
-	// First check if the work fits the current work
-
-	if (wId < 0)
-		return false;
+bool beamStratum::testSolution(const beam::Difficulty& diff, const vector<uint32_t>& indices, vector<uint8_t>& compressed) {
 
 	// get the compressed representation of the solution and check against target
 	compressed = GetMinimalFromIndices(indices,25);
@@ -357,7 +355,7 @@ bool beamStratum::testSolution(int64_t wId, uint64_t nonceIn, const vector<uint3
 	beam::uintBig_t<32> hv;
 	Sha256_Onestep(compressed.data(), compressed.size(), hv.m_pData);
 
-	return powDiff.IsTargetReached(hv);
+	return diff.IsTargetReached(hv);
 }
 
 void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vector<uint8_t>& compressed) {
@@ -390,11 +388,11 @@ void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vecto
 
 
 // Will be called by clHost class for check & submit
-void beamStratum::handleSolution(int64_t &workId, uint64_t &nonce, vector<uint32_t> &indices) {
+void beamStratum::handleSolution(const WorkDescription& wd, vector<uint32_t> &indices) {
 
 	std::vector<uint8_t> compressed;
-	if (testSolution(workId, nonce, indices, compressed))
-		std::thread (&beamStratum::submitSolution,this,workId,nonce,compressed).detach();
+	if (testSolution(wd.powDiff, indices, compressed))
+		std::thread (&beamStratum::submitSolution,this,wd.workId,wd.nonce,std::move(compressed)).detach();
 }
 
 

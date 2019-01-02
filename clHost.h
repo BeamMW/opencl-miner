@@ -20,8 +20,7 @@ namespace beamMiner {
 struct clCallbackData {
 	void* host;
 	uint32_t gpuIndex;
-	int64_t workId;
-	uint64_t nonce;
+	beamStratum::WorkDescription wd;
 };
 
 class clHost {
