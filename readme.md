@@ -46,7 +46,7 @@ selected for mining or all selected miner fail in the compatibility check.
   sudo apt update
   sudo apt install g++-7 libboost-all-dev libssl-dev -y
 ```
-1. Set it up so the symbolic links `gcc`, `g++` point to the newer version:
+2. Set it up so the symbolic links `gcc`, `g++` point to the newer version:
 ```
   sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 \
                            --slave /usr/bin/g++ g++ /usr/bin/g++-7 
@@ -54,17 +54,17 @@ selected for mining or all selected miner fail in the compatibility check.
   gcc --version
   g++ --version
 ```
-1. Install OpenCL
+3. Install OpenCL
 ```
   sudo apt install ocl-icd-* opencl-headers
 ```
-1. Install latest CMake 
+4. Install latest CMake 
 ```
   wget "https://cmake.org/files/v3.12/cmake-3.12.0-Linux-x86_64.sh"
   sudo sh cmake-3.12.0-Linux-x86_64.sh --skip-license --prefix=/usr
 ```
-1. Go to beam-opencl-miner project folder and call `cmake -DCMAKE_BUILD_TYPE=Release . && make -j4`.
-1. You'll find beam-opencl-miner binary in `bin` folder.
+5. Go to beam-opencl-miner project folder and call `cmake -DCMAKE_BUILD_TYPE=Release . && make -j4`.
+6. You'll find beam-opencl-miner binary in `bin` folder.
 
 ## Mac
 1. Install Brew Package Manager.
