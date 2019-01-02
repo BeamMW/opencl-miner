@@ -77,7 +77,8 @@ class beamStratum {
 	bool verifyCertificate(bool,boost::asio::ssl::verify_context& );
 
 	// Solution Check & Submit
-	void testAndSubmit(int64_t, uint64_t, std::vector<uint32_t>);
+	bool testSolution(int64_t, uint64_t, const std::vector<uint32_t>&, std::vector<uint8_t>&);
+	void submitSolution(int64_t, uint64_t, const std::vector<uint8_t>&);
 
 	public:
 	beamStratum(string, string, string, bool);
