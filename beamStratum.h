@@ -56,6 +56,7 @@ class beamStratum {
 	std::vector<uint8_t> serverWork;
 	std::atomic<uint64_t> nonce;
 	beam::Difficulty powDiff;
+	std::vector<uint8_t> poolNonce;
 
 	//Stratum sending subsystem
 	bool activeWrite = false;

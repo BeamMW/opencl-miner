@@ -178,6 +178,12 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 						int32_t code = jsonTree.get<int32_t>("code");
 						if (code >= 0) {
 							cout << "Login at node accepted \n" << endl;
+							if (jsonTree.count("nonceprefix") > 0) {
+								string poolNonceStr = jsonTree.get<string>("nonceprefix");
+								poolNonce = parseHex(poolNonceStr);
+							} else {
+								poolNonce.clear();
+							}
 						} else {
 							cout << "Error: Login at node not accepted. Closing miner." << endl;
 							exit(0);
@@ -246,8 +252,18 @@ void beamStratum::getWork(int64_t* workOut, uint64_t* nonceOut, uint8_t* dataOut
 
 	// nonce is atomic, so every time we call this will get a nonce increased by one
 	*nonceOut = nonce.fetch_add(1);
+
+	uint8_t* noncePoint = (uint8_t*) nonceOut;
+
+	uint32_t poolNonceBytes = min<uint32_t>(poolNonce.size(), 8);
+	for (uint32_t i=0; i<poolNonce.size(); i++) {
+		noncePoint[8-poolNonceBytes+i] = poolNonce[i];
+	}
 	
+	updateMutex.lock();
+	*workOut = workId;
 	memcpy(dataOut, serverWork.data(), 32);
+	updateMutex.unlock();
 }
 
 
@@ -333,7 +349,7 @@ std::vector<unsigned char> GetMinimalFromIndices(std::vector<uint32_t> indices, 
 void beamStratum::testAndSubmit(int64_t wId, uint64_t nonceIn, vector<uint32_t> indices) {
 	// First check if the work fits the current work
 
-	if (wId == workId) {	
+	if (wId >= 0) {	
 
 		// get the compressed representation of the solution and check against target
 		vector<uint8_t> compressed;
