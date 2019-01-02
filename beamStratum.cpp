@@ -79,7 +79,7 @@ void beamStratum::connect() {
 		io_service.reset();
 		socket->lowest_layer().close();
 
-		cout << "Lost connection to API server" << endl;
+		cout << "Lost connection to BEAM stratum server" << endl;
 		cout << "Trying to connect in 5 seconds"<< endl;
 
 		std::this_thread::sleep_for(std::chrono::seconds(5));

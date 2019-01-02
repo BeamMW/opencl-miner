@@ -37,6 +37,8 @@ class clHost {
 	vector< vector<cl::Buffer> > buffers;
 	vector< vector<cl::Kernel> > kernels;
 
+	vector<bool> is3G;
+
 	// Statistics
 	vector<int> solutionCnt;
 
@@ -50,7 +52,7 @@ class clHost {
 
 	// Functions
 	void detectPlatFormDevices(vector<int32_t>, bool);
-	void loadAndCompileKernel(cl::Device &, uint32_t);
+	void loadAndCompileKernel(cl::Device &, uint32_t, bool);
 	void queueKernels(uint32_t, clCallbackData*);
 	
 	// The connector

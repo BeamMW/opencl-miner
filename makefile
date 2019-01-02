@@ -19,7 +19,7 @@ $(LINK_TARGET) : $(OBJS)
 
 $(OBJDIR)/%.o: %.cpp $(HEADERS)
 	mkdir -p $(@D)
-	g++ -O2 -std=c++11 -o $@ -c ./$< -I./beam -I./clHeaders
+	g++ -g -std=c++11 -o $@ -c ./$< -I./beam -I./clHeaders
 
 all : $(LINK_TARGET)
 	echo All done
