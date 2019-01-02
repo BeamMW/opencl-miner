@@ -69,6 +69,10 @@ add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
 
+if(LINUX)
+	target_link_libraries(${TARGET_NAME} -static-libstdc++ -static-libgcc)
+endif()
+
 if(MSVC)
     target_link_libraries(${TARGET_NAME} crypt32.lib)
     if(MSVC_VERSION GREATER_EQUAL 1900)
