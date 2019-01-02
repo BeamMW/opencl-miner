@@ -68,6 +68,7 @@ set(MINER_SRC
 add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHeaders)
 
 if(MSVC)
     target_link_libraries(${TARGET_NAME} crypt32.lib)
