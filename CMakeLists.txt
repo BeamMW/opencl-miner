@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1) 
-set(TARGET_NAME beamMiner)
+project(beam-opencl-miner)
+set(TARGET_NAME beam-opencl-miner)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,10 +30,10 @@ if (MSVC)
 
 endif()
 
-set(OPENSSL_USE_STATIC_LIBS ON)
 set(OPENSSL_MSVC_STATIC_RT ON)
 find_package(OpenSSL REQUIRED)
 if( OpenSSL_FOUND )
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
     link_directories(${OPENSSL_LIBRARIES})
     include_directories(${OPENSSL_INCLUDE_DIR})
     message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
@@ -67,6 +68,12 @@ set(MINER_SRC
 add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHeaders)
+
+if(UNIX)
+    find_package(Threads)
+    target_link_libraries(${TARGET_NAME} Threads::Threads)
+endif()
 
 if(MSVC)
     target_link_libraries(${TARGET_NAME} crypt32.lib)
