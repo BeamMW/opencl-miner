@@ -196,11 +196,11 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				if (deviceMemory > needed_4G) {
 					cout << "   Memory check for 4G kernel passed" << endl;
 					loadAndCompileKernel(nDev[di], pl, false);
-				} else if (deviceMemory > needed_3G) {
+				} /*else if (deviceMemory > needed_3G) {
 					cout << "   Memory check for 3G kernel passed" << endl;
 					loadAndCompileKernel(nDev[di], pl, true);
-				} else {
-					cout << "   Memory check failed, required minimum memory: " << needed_3G/(1024*1024) << endl;
+				} */ else {
+					cout << "   Memory check failed, required minimum memory: " << needed_4G/(1024*1024) << endl;
 				}
 			} else {
 				cout << "   Device will not be used, it was not included in --devices parameter." << endl;
