@@ -68,7 +68,7 @@ matrix:
         - BUILD_TYPE=Debug
         - OS_FOLDER=linux
       script:
-        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4;
+        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4 -f Makefile;
 
 ###############################################################################
 # Linux Release
@@ -98,7 +98,7 @@ matrix:
         - BUILD_TYPE=Release
         - OS_FOLDER=linux
       script:
-        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4;
+        - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . && make -j 4 -f Makefile;
 
 ###############################################################################
 # Common part
