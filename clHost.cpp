@@ -422,12 +422,16 @@ void clHost::startMining() {
 
 		// Print performance stats (roughly)
 		cout << "Performance: ";
+		uint32_t totalSols = 0;
 		for (int i=0; i<devices.size(); i++) {
 			uint32_t sol = solutionCnt[i];
 			solutionCnt[i] = 0;
+			totalSols += sol;
 			cout << fixed << setprecision(2) << (double) sol / 15.0 << " sol/s ";			
 			
 		}
+		
+		if (devices.size() > 1) cout << "| Total: " << setprecision(2) << (double) totalSols / 15.0 << " sol/s ";	
 		cout << endl;
 
 		// Check if there are paused devices and restart them
