@@ -16,7 +16,6 @@ if(Boost_FOUND)
 endif()
 
 if (MSVC)
-
     # use static runtime
     foreach(flag_var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
         CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
@@ -28,12 +27,16 @@ if (MSVC)
         endif(${flag_var} MATCHES "/MD")
     endforeach(flag_var)
 
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+    set(OPENSSL_MSVC_STATIC_RT TRUE)
 endif()
 
-set(OPENSSL_MSVC_STATIC_RT ON)
+
 find_package(OpenSSL REQUIRED)
 if( OpenSSL_FOUND )
-    set(OPENSSL_USE_STATIC_LIBS TRUE)
+    if (UNIX)
+        set(OPENSSL_USE_STATIC_LIBS TRUE)
+    endif()
     link_directories(${OPENSSL_LIBRARIES})
     include_directories(${OPENSSL_INCLUDE_DIR})
     message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
