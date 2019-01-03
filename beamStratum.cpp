@@ -250,13 +250,15 @@ bool beamStratum::hasWork() {
 void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 
 	// nonce is atomic, so every time we call this will get a nonce increased by one
-	wd.nonce = nonce.fetch_add(1);
+	uint64_t cliNonce = nonce.fetch_add(1);
 
-	uint8_t* noncePoint = (uint8_t*) wd.nonce;
+	uint8_t* noncePoint = (uint8_t*) &wd.nonce;
 
-	uint32_t poolNonceBytes = min<uint32_t>(poolNonce.size(), 8);
-	for (uint32_t i=0; i<poolNonce.size(); i++) {
-		noncePoint[8-poolNonceBytes+i] = poolNonce[i];
+	uint32_t poolNonceBytes = min<uint32_t>(poolNonce.size(), 6); 	// Need some range left for miner
+	wd.nonce = (cliNonce << 8*poolNonceBytes);
+
+	for (uint32_t i=0; i<poolNonceBytes; i++) {			// Prefix pool nonce
+		noncePoint[i] = poolNonce[i];
 	}
 	
 	updateMutex.lock();
