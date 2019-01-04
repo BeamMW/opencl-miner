@@ -34,7 +34,7 @@ after_build:
 
     set BEAM_VERSION=1.0.%BEAM_VERSION_REVISION%
 
-    7z a c:/projects/opencl-miner/%BUILD_CONFIG%/opencl-miner-%BEAM_VERSION%.zip c:/projects/opencl-miner/%BUILD_CONFIG%/beam-opencl-miner.exe c:/projects/opencl-miner/equihash_150_5.cl
+    7z a c:/projects/opencl-miner/%BUILD_CONFIG%/opencl-miner-%BEAM_VERSION%.zip c:/projects/opencl-miner/%BUILD_CONFIG%/beam-opencl-miner.exe
     
     copy c:\projects\opencl-miner\%BUILD_CONFIG%\opencl-miner-%BEAM_VERSION%.zip c:\projects\opencl-miner\opencl-miner-%BEAM_VERSION%.zip
 
