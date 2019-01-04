@@ -483,6 +483,7 @@ void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vecto
 		json << "{\"params\": [\"" << apiKey << "\", \"" << wId  <<"\"," 
 			<< "\"" << solutionHex.str() << "\", \"0000\", \"" << nonceHex.str() << "\"], \"id\": 4, "
 			<< "\"method\": \"mining.submit\"}";
+		state = SUBMITTING;
 	}
 
 	queueDataSend(json.str());	
