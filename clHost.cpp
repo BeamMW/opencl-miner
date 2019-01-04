@@ -4,6 +4,7 @@
 // Copyright 2018 Wilke Trei
 
 #include "clHost.h"
+#include "./kernels/equihash_150_5_inc.h"
 
 namespace beamMiner {
 
@@ -50,21 +51,9 @@ void CL_CALLBACK CCallbackFunc(cl_event ev, cl_int err , void* data) {
 void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	cout << "   Loading and compiling Beam OpenCL Kernel" << endl;
 
-	// reading the kernel file
-	string kernelFileName;
-	if (use3G) {
-		kernelFileName = "./equihash_150_5_3G.cl";
-	} else {
-		kernelFileName = "./equihash_150_5.cl";
-	}
-	cl_int err;
-	ifstream file(kernelFileName.c_str());
-	if (!file.is_open()) {
-		cout << "Error: Kernel file not found!" << endl;
-		exit(0);	
-	}
+	// reading the kernel
+	string progStr = string(__equihash_150_5_cl, __equihash_150_5_cl_len); 
 
-	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>()));
 	cl::Program::Sources source(1,std::make_pair(progStr.c_str(), progStr.length()+1));
 
 	// Create a program object and build it
@@ -72,7 +61,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	devicesTMP.push_back(device);
 
 	cl::Program program(contexts[pl], source);
-	err = program.build(devicesTMP,"");
+	cl_int err = program.build(devicesTMP,"");
 
 	// Check if the build was Ok
 	if (!err) {
