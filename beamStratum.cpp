@@ -6,11 +6,14 @@
 
 #include "beamStratum.h"
 #include "crypto/sha256.c"
+#include "json.hpp"
 
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
 #define htobe32(x) OSSwapHostToBigInt32(x)
 #endif
+
+using json = nlohmann::json;
 
 namespace beamMiner {
 
@@ -129,7 +132,14 @@ void beamStratum::handleHandshake(const boost::system::error_code& error) {
 		
 		// The connection was successful. Send the login request
 		std::stringstream json;
-		json << "{\"method\":\"login\", \"api_key\":\"" << apiKey << "\", \"id\":\"login\",\"jsonrpc\":\"2.0\"} \n";
+
+		if (!slushPoolProtocol){
+			json << "{\"method\":\"login\", \"api_key\":\"" << apiKey << "\", \"id\":\"login\",\"jsonrpc\":\"2.0\"} \n";
+		}else{
+			// TODO: reconnecting with the same session id
+			json << "{\"id\": " << nextId() << ", \"method\": \"mining.subscribe\", \"params\": []}" << endl;
+			state = SUBSCRIBING;
+		}
 		queueDataSend(json.str());	
 	} else {
 		cout << "Handshake failed: " << error.message() << "\n";
@@ -150,6 +160,148 @@ vector<uint8_t> parseHex (string input) {
 	return result;
 }
 
+void beamStratum::readStratumFromNode(const pt::iptree& jsonTree) {
+	// This should be for any valid stratum
+	if (jsonTree.count("method") > 0) {	
+		string method = jsonTree.get<string>("method");
+
+		// Result to a node request
+		if (method.compare("result") == 0) {
+			// A login reply
+			if (jsonTree.get<string>("id").compare("login") == 0) {
+				int32_t code = jsonTree.get<int32_t>("code");
+				if (code >= 0) {
+					cout << "Login at node accepted \n" << endl;
+					if (jsonTree.count("nonceprefix") > 0) {
+						poolMining = true;
+						string poolNonceStr = jsonTree.get<string>("nonceprefix");
+						poolNonce = parseHex(poolNonceStr);
+					} else {
+						poolNonce.clear();
+					}
+				} else {
+					cout << "Error: Login at node not accepted. Closing miner." << endl;
+					exit(0);
+				}	
+			} else {	// A share reply
+				int32_t code = jsonTree.get<int32_t>("code");
+				if (code == 1) {
+					cout << "Solution for work id " << jsonTree.get<string>("id") << "accepted" << endl;
+				} else {
+					cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << "not accepted" << endl;
+				}
+			}
+		}
+
+		// A new job decription;
+		if (method.compare("job") == 0) {
+			updateMutex.lock();
+			// Get new work load
+			string work = jsonTree.get<string>("input");
+			serverWork = parseHex(work);
+
+			// Get jobId of new job
+			workId =  jsonTree.get<uint64_t>("id");	
+			
+			// Get the target difficulty
+			uint32_t stratDiff =  jsonTree.get<uint32_t>("difficulty");
+			powDiff = beam::Difficulty(stratDiff);
+			updateMutex.unlock();	
+
+			cout << "New work received with id " << workId << " at difficulty " << powDiff.ToFloat() << endl;	
+		}
+
+		// Cancel a running job
+		if (method.compare("cancel") == 0) {
+			updateMutex.lock();
+			// Get jobId of canceled job
+			uint64_t id =  jsonTree.get<uint64_t>("id");
+			// Set it to an unlikely value;
+			if (id == workId) workId = -1;
+			updateMutex.unlock();
+		}
+	}
+}
+
+void beamStratum::readStratumFromPool(const string& jsonStr) {
+	json j = json::parse(jsonStr);
+	if (j.find("method") != j.end()){
+		string method = j["method"];
+		if (method.compare("mining.set_difficulty") == 0){
+			if (j["params"].size() > 0){
+				uint32_t stratDiff = j["params"][0];
+				updateMutex.lock();
+				powDiff = beam::Difficulty(stratDiff);
+				updateMutex.unlock();
+			}
+		}else if(method.compare("mining.notify") == 0){
+			if (j["params"].size() >= 9){
+				updateMutex.lock();
+
+				string wid = j["params"][0];
+				workId = atol(wid.c_str());
+
+				string work = j["params"][2];
+				serverWork = parseHex(work);
+
+				bool clean = j["params"][8];
+				if (clean) {
+					initNonce();
+				}
+
+				updateMutex.unlock();
+			}else{
+				cout << "Invalid job notify: " << jsonStr << endl;
+			}
+		}
+		
+	}else{
+		bool res = false;
+		switch (state){
+			case SUBSCRIBING:
+				if(j["error"].is_null()){
+					string poolNonceStr = j["result"][1];
+					poolNonce = parseHex(poolNonceStr);
+
+					// TODO: session id, noncesuffix size
+
+
+					std::stringstream json;
+					json << "{\"method\":\"mining.authorize\", \"params\":[\"" << apiKey << "\"], \"id\":" << nextId() << ",\"jsonrpc\":\"2.0\"}" << endl;
+					state = AUTHORIZING;
+					queueDataSend(json.str());	
+
+				}
+
+				break;
+
+			case AUTHORIZING:
+				res = j["result"];
+				if (res){
+					state = AUTHORIZED;
+				}else{
+					cout << "Error: authorize invalid " << "(" << j["error"] << ")" << endl;
+					exit(-1);
+				}
+				break;
+
+			case SUBMITTING:
+				res = j["result"];
+				if (res){
+					cout << "Accept [" << j["id"] << "] " << powDiff.ToFloat() << endl;
+					submitAccept++;
+				}else{
+					cout << "Reject [" << j["id"] << "] " << powDiff.ToFloat() << "(" << j["error"] << ")" << endl;
+					submitReject++;
+				}
+
+				state = AUTHORIZED;
+				break;
+			default: 
+				cout << "Unkown: " << jsonStr << endl;
+		}
+	}
+}
 
 // Main stratum read function, will be called on every received data
 void beamStratum::readStratum(const boost::system::error_code& err) {
@@ -162,73 +314,16 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 		if (debug) cout << "Incomming Stratum: " << response << endl;
 
 		// Parse the input to a property tree
-		pt::iptree jsonTree;
 		try {
 			istringstream jsonStream(response);
-			pt::read_json(jsonStream,jsonTree);
 
-			// This should be for any valid stratum
-			if (jsonTree.count("method") > 0) {	
-				string method = jsonTree.get<string>("method");
-			
-				// Result to a node request
-				if (method.compare("result") == 0) {
-					// A login reply
-					if (jsonTree.get<string>("id").compare("login") == 0) {
-						int32_t code = jsonTree.get<int32_t>("code");
-						if (code >= 0) {
-							cout << "Login at node accepted \n" << endl;
-							if (jsonTree.count("nonceprefix") > 0) {
-								string poolNonceStr = jsonTree.get<string>("nonceprefix");
-								poolNonce = parseHex(poolNonceStr);
-							} else {
-								poolNonce.clear();
-							}
-						} else {
-							cout << "Error: Login at node not accepted. Closing miner." << endl;
-							exit(0);
-						}	
-					} else {	// A share reply
-						int32_t code = jsonTree.get<int32_t>("code");
-						if (code == 1) {
-							cout << "Solution for work id " << jsonTree.get<string>("id") << "accepted" << endl;
-						} else {
-							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << "not accepted" << endl;
-						}
-					}
-				}
-
-				// A new job decription;
-				if (method.compare("job") == 0) {
-					updateMutex.lock();
-					// Get new work load
-					string work = jsonTree.get<string>("input");
-					serverWork = parseHex(work);
-
-					// Get jobId of new job
-					workId =  jsonTree.get<uint64_t>("id");	
-					
-					// Get the target difficulty
-					uint32_t stratDiff =  jsonTree.get<uint32_t>("difficulty");
-					powDiff = beam::Difficulty(stratDiff);
-					updateMutex.unlock();	
-
-					cout << "New work received with id " << workId << " at difficulty " << powDiff.ToFloat() << endl;	
-				}
-
-				// Cancel a running job
-				if (method.compare("cancel") == 0) {
-					updateMutex.lock();
-					// Get jobId of canceled job
-					uint64_t id =  jsonTree.get<uint64_t>("id");
-					// Set it to an unlikely value;
-					if (id == workId) workId = -1;
-					updateMutex.unlock();
-				}
+			if (!poolMining){
+				pt::iptree jsonTree;
+				pt::read_json(jsonStream,jsonTree);
+				readStratumFromNode(jsonTree);
+			}else{
+				readStratumFromPool(jsonStream.str());
 			}
-
-			
-
 		} catch(const pt::ptree_error &e) {
 			cout << "Json parse error: " << e.what() << endl; 
 		}
@@ -380,8 +475,15 @@ void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vecto
 			
 	// Line the stratum msg up
 	std::stringstream json;
-	json << "{\"method\" : \"solution\", \"id\": \"" << wId << "\", \"nonce\": \"" << nonceHex.str() 
-			<< "\", \"output\": \"" << solutionHex.str() << "\", \"jsonrpc\":\"2.0\" } \n";
+
+	if(!slushPoolProtocol){
+		json << "{\"method\" : \"solution\", \"id\": \"" << wId << "\", \"nonce\": \"" << nonceHex.str() 
+				<< "\", \"output\": \"" << solutionHex.str() << "\", \"jsonrpc\":\"2.0\" } \n";
+	}else{
+		json << "{\"params\": [\"" << apiKey << "\", \"" << wId  <<"\"," 
+			<< "\"" << solutionHex.str() << "\", \"0000\", \"" << nonceHex.str() << "\"], \"id\": 4, "
+			<< "\"method\": \"mining.submit\"}";
+	}
 
 	queueDataSend(json.str());	
 
@@ -397,8 +499,24 @@ void beamStratum::handleSolution(const WorkDescription& wd, vector<uint32_t> &in
 		std::thread (&beamStratum::submitSolution,this,wd.workId,wd.nonce,std::move(compressed)).detach();
 }
 
+void beamStratum::initNonce(){
+	random_device rd;
+	default_random_engine generator(rd());
+	uniform_int_distribution<uint64_t> distribution(0,0xFFFFFFFFFFFFFFFF);
 
-beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tlsv12)  {
+	// We pick a random start nonce
+	nonce = distribution(generator);
+}
+
+int beamStratum::nextId(){
+	jsonIdMutex.lock();
+	jsonId++;
+	jsonIdMutex.unlock();
+
+	return jsonId;
+};
+
+beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn, bool poolMiningIn) : res(io_service), context(boost::asio::ssl::context::tls)  {
 
 	context.set_options(	  boost::asio::ssl::context::default_workarounds
 				| boost::asio::ssl::context::no_sslv2
@@ -410,16 +528,13 @@ beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool deb
 	port = portIn;
 	apiKey = apiKeyIn;
 	debug = debugIn;
+	poolMining = poolMiningIn;
+	slushPoolProtocol = poolMiningIn; // --pool indicated
 
 	// Assign the work field and nonce
 	serverWork.assign(32,(uint8_t) 0);
 
-	random_device rd;
-	default_random_engine generator(rd());
-	uniform_int_distribution<uint64_t> distribution(0,0xFFFFFFFFFFFFFFFF);
-
-	// We pick a random start nonce
-	nonce = distribution(generator);
+	initNonce();
 
 	// No work in the beginning
 	workId = -1;

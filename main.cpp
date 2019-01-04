@@ -21,7 +21,7 @@ inline vector<string> split(const string &s, char delim) {
     return split(s, delim, elems);
 }
 
-uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, bool &cpuMine, vector<int32_t> &devices ) {
+uint32_t cmdParser(vector<string> args, bool &poolMining, string &host, string &port, string &apiCred, bool &debug, bool &cpuMine, vector<int32_t> &devices ) {
 	bool hostSet = false;
 	bool apiSet = false;
 	
@@ -31,7 +31,8 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 				return 0x4;
 			}
 
-			if (args[i].compare("--server")  == 0) {
+			if (args[i].compare("--server")  == 0 || args[i].compare("--pool")  == 0 ) {
+				poolMining = (args[i].compare("--pool")  == 0);
 				if (i+1 < args.size()) {
 					vector<string> tmp = split(args[i+1], ':');
 					if (tmp.size() == 2) {
@@ -99,9 +100,10 @@ int main(int argc, char* argv[]) {
 	bool debug = false;
 	bool cpuMine = false;
 	bool useTLS = true;
+	bool poolMining = false;
 	vector<int32_t> devices;
 
-	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices);
+	uint32_t parsing = cmdParser(cmdLineArgs, poolMining, host, port, apiCred, debug, cpuMine, devices);
 
 	cout << "-====================================-" << endl;
 	cout << "   BEAM Equihash 150/5 OpenCL miner   " << endl;
@@ -110,7 +112,7 @@ int main(int argc, char* argv[]) {
 
 	if (parsing != 0) {
 		if (parsing & 0x1) {
-			cout << "Error: Parameter --server missing" << endl;
+			cout << "Error: Parameter --server or --pool missing" << endl;
 		}
 
 		if (parsing & 0x2) {
@@ -118,16 +120,15 @@ int main(int argc, char* argv[]) {
 		}
 
 		cout << "Parameters: " << endl;
-		cout << " --help / -h 			Showing this message" << endl;
-		cout << " --server <server>:<port>	The BEAM stratum server and port to connect to (required)" << endl;
-		cout << " --key <key>			The BEAM stratum server API key (required)" << endl;
-		cout << " --devices <numbers>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
-		cout << " --enable-cpu			Enable mining on OpenCL CPU devices" << endl;
-		cout << " --version			Prints the version number" << endl;
+		cout << " --help / -h 							Showing this message" << endl;
+		cout << " --server | --pool <server>:<port>		The BEAM stratum server and port to connect to (required)" << endl;
+		cout << " --key <key>							The BEAM stratum server API key (required)" << endl;
+		cout << " --devices <numbers>					A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
+		cout << " --enable-cpu							Enable mining on OpenCL CPU devices" << endl;
 		exit(0);
 	}
 
-	beamMiner::beamStratum myStratum(host, port, apiCred, debug);
+	beamMiner::beamStratum myStratum(host, port, apiCred, poolMining, debug);
 
 	beamMiner::clHost myClHost;
 	

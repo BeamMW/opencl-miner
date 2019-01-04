@@ -4,3 +4,7 @@
 makefile
 beamMiner
 beamMiner.exe
+
+CMakeCache.txt
+
+CMakeFiles/*
