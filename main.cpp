@@ -70,6 +70,11 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 			if (args[i].compare("--debug")  == 0) {
 				debug = true;
 			}
+	
+			if (args[i].compare("--version")  == 0) {
+				cout << "1.0 Initial release for BEAM main network (Jan 3rd 2019)" << endl;
+				exit(0);
+			}
 		}
 	}
 
@@ -85,9 +90,7 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 
 int main(int argc, char* argv[]) {
 
-	cout << "====================================" << endl;
-	cout << "  BEAM Equihash 150/5 OpenCL miner  " << endl;
-	cout << "====================================" << endl;
+	
 
 	vector<string> cmdLineArgs(argv, argv+argc);
 	string host;
@@ -99,6 +102,11 @@ int main(int argc, char* argv[]) {
 	vector<int32_t> devices;
 
 	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices);
+
+	cout << "-====================================-" << endl;
+	cout << "   BEAM Equihash 150/5 OpenCL miner   " << endl;
+	cout << "          v1.0, Jan 3rd 2019          " << endl;
+	cout << "-====================================-" << endl;
 
 	if (parsing != 0) {
 		if (parsing & 0x1) {
@@ -115,6 +123,7 @@ int main(int argc, char* argv[]) {
 		cout << " --key <key>			The BEAM stratum server API key (required)" << endl;
 		cout << " --devices <numbers>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
 		cout << " --enable-cpu			Enable mining on OpenCL CPU devices" << endl;
+		cout << " --version			Prints the version number" << endl;
 		exit(0);
 	}
 

@@ -7,6 +7,11 @@
 #include "beamStratum.h"
 #include "crypto/sha256.c"
 
+#ifdef __APPLE__
+#include <libkern/OSByteOrder.h>
+#define htobe32(x) OSSwapHostToBigInt32(x)
+#endif
+
 namespace beamMiner {
 
 // This one ensures that the calling thread can work on immediately
@@ -79,7 +84,7 @@ void beamStratum::connect() {
 		io_service.reset();
 		socket->lowest_layer().close();
 
-		cout << "Lost connection to API server" << endl;
+		cout << "Lost connection to BEAM stratum server" << endl;
 		cout << "Trying to connect in 5 seconds"<< endl;
 
 		std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -173,6 +178,12 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 						int32_t code = jsonTree.get<int32_t>("code");
 						if (code >= 0) {
 							cout << "Login at node accepted \n" << endl;
+							if (jsonTree.count("nonceprefix") > 0) {
+								string poolNonceStr = jsonTree.get<string>("nonceprefix");
+								poolNonce = parseHex(poolNonceStr);
+							} else {
+								poolNonce.clear();
+							}
 						} else {
 							cout << "Error: Login at node not accepted. Closing miner." << endl;
 							exit(0);
@@ -236,13 +247,27 @@ bool beamStratum::hasWork() {
 
 
 // function the clHost class uses to fetch new work
-void beamStratum::getWork(int64_t* workOut, uint64_t* nonceOut, uint8_t* dataOut) {
-	*workOut = workId;
+void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 
 	// nonce is atomic, so every time we call this will get a nonce increased by one
-	*nonceOut = nonce.fetch_add(1);
+	uint64_t cliNonce = nonce.fetch_add(1);
+
+	uint8_t* noncePoint = (uint8_t*) &wd.nonce;
+
+	uint32_t poolNonceBytes = min<uint32_t>(poolNonce.size(), 6); 	// Need some range left for miner
+	wd.nonce = (cliNonce << 8*poolNonceBytes);
+
+	for (uint32_t i=0; i<poolNonceBytes; i++) {			// Prefix pool nonce
+		noncePoint[i] = poolNonce[i];
+	}
 	
+	updateMutex.lock();
+
+	wd.workId = workId;
+	wd.powDiff = powDiff;
 	memcpy(dataOut, serverWork.data(), 32);
+
+	updateMutex.unlock();
 }
 
 
@@ -324,58 +349,56 @@ std::vector<unsigned char> GetMinimalFromIndices(std::vector<uint32_t> indices, 
 	return ret;
 }
 
+bool beamStratum::testSolution(const beam::Difficulty& diff, const vector<uint32_t>& indices, vector<uint8_t>& compressed) {
 
-void beamStratum::testAndSubmit(int64_t wId, uint64_t nonceIn, vector<uint32_t> indices) {
-	// First check if the work fits the current work
+	// get the compressed representation of the solution and check against target
+	compressed = GetMinimalFromIndices(indices,25);
 
-	if (wId == workId) {	
+	beam::uintBig_t<32> hv;
+	Sha256_Onestep(compressed.data(), compressed.size(), hv.m_pData);
 
-		// get the compressed representation of the solution and check against target
-		vector<uint8_t> compressed;
-		compressed = GetMinimalFromIndices(indices,25);
+	return diff.IsTargetReached(hv);
+}
 
-		beam::uintBig_t<32> hv;
-		Sha256_Onestep(compressed.data(), compressed.size(), hv.m_pData);
+void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vector<uint8_t>& compressed) {
 
-		if (powDiff.IsTargetReached(hv)) {	
-	
-			// The solutions target is low enough, lets submit it
-			vector<uint8_t> nonceBytes;
+	// The solutions target is low enough, lets submit it
+	vector<uint8_t> nonceBytes;
 			
-			nonceBytes.assign(8,0);
-			*((uint64_t*) nonceBytes.data()) = nonceIn;
+	nonceBytes.assign(8,0);
+	*((uint64_t*) nonceBytes.data()) = nonceIn;
 
-			stringstream nonceHex;
-			for (int c=0; c<nonceBytes.size(); c++) {
-				nonceHex << std::setfill('0') << std::setw(2) << std::hex << (unsigned) nonceBytes[c];
-			}
-
-			stringstream solutionHex;
-			for (int c=0; c<compressed.size(); c++) {
-				solutionHex << std::setfill('0') << std::setw(2) << std::hex << (unsigned) compressed[c];
-			}	
-			
-			// Line the stratum msg up
-			std::stringstream json;
-			json << "{\"method\" : \"solution\", \"id\": \"" << wId << "\", \"nonce\": \"" << nonceHex.str() 
-			     << "\", \"output\": \"" << solutionHex.str() << "\", \"jsonrpc\":\"2.0\" } \n";
-
-			queueDataSend(json.str());	
-
-			cout << "Submitting solution to job " << wId << " with nonce " <<  nonceHex.str() << endl;
-
-		}
+	stringstream nonceHex;
+	for (int c=0; c<nonceBytes.size(); c++) {
+		nonceHex << std::setfill('0') << std::setw(2) << std::hex << (unsigned) nonceBytes[c];
 	}
+
+	stringstream solutionHex;
+	for (int c=0; c<compressed.size(); c++) {
+		solutionHex << std::setfill('0') << std::setw(2) << std::hex << (unsigned) compressed[c];
+	}	
+			
+	// Line the stratum msg up
+	std::stringstream json;
+	json << "{\"method\" : \"solution\", \"id\": \"" << wId << "\", \"nonce\": \"" << nonceHex.str() 
+			<< "\", \"output\": \"" << solutionHex.str() << "\", \"jsonrpc\":\"2.0\" } \n";
+
+	queueDataSend(json.str());	
+
+	cout << "Submitting solution to job " << wId << " with nonce " <<  nonceHex.str() << endl;
 }
 
 
 // Will be called by clHost class for check & submit
-void beamStratum::handleSolution(int64_t &workId, uint64_t &nonce, vector<uint32_t> &indices) {
-	std::thread (&beamStratum::testAndSubmit,this,workId,nonce,indices).detach();
+void beamStratum::handleSolution(const WorkDescription& wd, vector<uint32_t> &indices) {
+
+	std::vector<uint8_t> compressed;
+	if (testSolution(wd.powDiff, indices, compressed))
+		std::thread (&beamStratum::submitSolution,this,wd.workId,wd.nonce,std::move(compressed)).detach();
 }
 
 
-beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tls)  {
+beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tlsv12)  {
 
 	context.set_options(	  boost::asio::ssl::context::default_workarounds
 				| boost::asio::ssl::context::no_sslv2
