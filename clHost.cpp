@@ -180,7 +180,15 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				uint64_t needed_3G = 4* ((uint64_t) 570425344) + ((uint64_t) 868220928) + 4096 + 196608 + 1296;
 
 				cout << "   Device reports " << deviceMemory / (1024*1024) << "MByte total memory" << endl;
-			
+
+				if ( hasExtension(nDev[di], "cl_amd_device_attribute_query") ) {
+					uint64_t freeDeviceMemory;
+				 	nDev[di].getInfo(0x4039, &freeDeviceMemory);  // CL_DEVICE_GLOBAL_FREE_MEMORY_AMD
+					freeDeviceMemory *= 1024;
+					cout << "   Device reports " << freeDeviceMemory / (1024*1024) << "MByte free memory (AMD)" << endl;
+					deviceMemory = min<uint64_t>(deviceMemory, freeDeviceMemory);
+				}
+				
 
 				if (deviceMemory > needed_4G) {
 					cout << "   Memory check for 4G kernel passed" << endl;
