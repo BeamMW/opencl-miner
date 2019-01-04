@@ -44,7 +44,8 @@ class beamStratum {
 
 	// Definitions belonging to the physical connection
 	boost::asio::io_service io_service;
-	boost::scoped_ptr< boost::asio::ssl::stream<tcp::socket> > socket;
+	boost::scoped_ptr< boost::asio::ssl::stream<tcp::socket> > SSLsocket;
+	boost::scoped_ptr< boost::asio::buffered_stream<tcp::socket> > nonSSLsocket;
 	tcp::resolver res;
 	boost::asio::streambuf requestBuffer;
 	boost::asio::streambuf responseBuffer;

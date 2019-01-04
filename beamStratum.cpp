@@ -17,6 +17,8 @@ using json = nlohmann::json;
 
 namespace beamMiner {
 
+
+
 // This one ensures that the calling thread can work on immediately
 void beamStratum::queueDataSend(string data) {
 	io_service.post(boost::bind(&beamStratum::syncSend,this, data)); 
@@ -27,6 +29,8 @@ void beamStratum::syncSend(string data) {
 	writeRequests.push_back(data);
 	activateWrite();
 }
+
+
 
 
 // Got granted we can write to our connection, lets do so	
@@ -41,7 +45,13 @@ void beamStratum::activateWrite() {
 		os << json;
 		if (debug) cout << "Write to connection: " << json;
 
-		boost::asio::async_write(*socket, requestBuffer, boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 		
+		if (slushPoolProtocol){
+			boost::asio::async_write(*nonSSLsocket, requestBuffer,
+				 boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 		
+		}else{
+			boost::asio::async_write(*SSLsocket, requestBuffer,
+				 boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 		
+		}
 	}
 }
 	
@@ -70,13 +80,18 @@ void beamStratum::connect() {
 		try {
 	    		tcp::resolver::iterator endpoint_iterator = res.resolve(q);
 			tcp::endpoint endpoint = *endpoint_iterator;
-			socket.reset(new boost::asio::ssl::stream<tcp::socket>(io_service, context));
+			if (!slushPoolProtocol){
+				SSLsocket.reset(new boost::asio::ssl::stream<tcp::socket>(io_service, context));
 
-			socket->set_verify_mode(boost::asio::ssl::verify_none);
-    			socket->set_verify_callback(boost::bind(&beamStratum::verifyCertificate, this, _1, _2));
+				SSLsocket->set_verify_mode(boost::asio::ssl::verify_none);
+				SSLsocket->set_verify_callback(boost::bind(&beamStratum::verifyCertificate, this, _1, _2));
+				SSLsocket->lowest_layer().async_connect(endpoint,boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));	
 
-			socket->lowest_layer().async_connect(endpoint,
-			boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));	
+			}else{
+				nonSSLsocket.reset(new boost::asio::buffered_stream<tcp::socket>(io_service));
+				nonSSLsocket->lowest_layer().async_connect(endpoint,boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));	
+			}
+			
 
 			io_service.run();
 		} catch (std::exception const& _e) {
@@ -85,7 +100,12 @@ void beamStratum::connect() {
 
 		workId = -1;
 		io_service.reset();
-		socket->lowest_layer().close();
+
+		if(slushPoolProtocol){
+			nonSSLsocket->lowest_layer().close();
+		}else{
+			SSLsocket->lowest_layer().close();
+		}
 
 		cout << "Lost connection to BEAM stratum server" << endl;
 		cout << "Trying to connect in 5 seconds"<< endl;
@@ -98,18 +118,34 @@ void beamStratum::connect() {
 // Once the physical connection is there start a TLS handshake
 void beamStratum::handleConnect(const boost::system::error_code& err, tcp::resolver::iterator endpoint_iterator) {
 	if (!err) {
-	cout << "Connected to node. Starting TLS handshake." << endl;
+		if(slushPoolProtocol){
+			cout << "Connected to pool. Starting mining." << endl;
+			// Listen to receive stratum input
+			boost::asio::async_read_until(*nonSSLsocket, responseBuffer, "\n", boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
 
-      	// The connection was successful. Do the TLS handshake
-	socket->async_handshake(boost::asio::ssl::stream_base::client,boost::bind(&beamStratum::handleHandshake, this, boost::asio::placeholders::error));
+			std::stringstream json;
+			// TODO: reconnecting with the same session id
+			json << "{\"id\": " << nextId() << ", \"method\": \"mining.subscribe\", \"params\": [\"opencl-miner\"]}" << endl;
+			state = SUBSCRIBING;
+			queueDataSend(json.str());	
+
+		}else{
+			cout << "Connected to node. Starting TLS handshake." << endl;
+
+			// The connection was successful. Do the TLS handshake
+			SSLsocket->async_handshake(boost::asio::ssl::stream_base::client,boost::bind(&beamStratum::handleHandshake, this, boost::asio::placeholders::error));
+		}
 	
-    	} else if (err != boost::asio::error::operation_aborted) {
+    } else if (err != boost::asio::error::operation_aborted) {
 		if (endpoint_iterator != tcp::resolver::iterator()) {
 			// The endpoint did not work, but we can try the next one
 			tcp::endpoint endpoint = *endpoint_iterator;
 
-			socket->lowest_layer().async_connect(endpoint,
-			boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));
+			if(slushPoolProtocol){
+				nonSSLsocket->lowest_layer().async_connect(endpoint,boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));
+			}else{
+				SSLsocket->lowest_layer().async_connect(endpoint,boost::bind(&beamStratum::handleConnect, this, boost::asio::placeholders::error, ++endpoint_iterator));
+			}
 		} 
 	} 	
 }
@@ -125,21 +161,14 @@ bool beamStratum::verifyCertificate(bool preverified, boost::asio::ssl::verify_c
 void beamStratum::handleHandshake(const boost::system::error_code& error) {
 	if (!error) {
 		// Listen to receive stratum input
-		boost::asio::async_read_until(*socket, responseBuffer, "\n",
-		boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
+		boost::asio::async_read_until(*SSLsocket, responseBuffer, "\n", boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
 
 		cout << "TLS Handshake sucess" << endl;
 		
 		// The connection was successful. Send the login request
 		std::stringstream json;
 
-		if (!slushPoolProtocol){
-			json << "{\"method\":\"login\", \"api_key\":\"" << apiKey << "\", \"id\":\"login\",\"jsonrpc\":\"2.0\"} \n";
-		}else{
-			// TODO: reconnecting with the same session id
-			json << "{\"id\": " << nextId() << ", \"method\": \"mining.subscribe\", \"params\": []}" << endl;
-			state = SUBSCRIBING;
-		}
+		json << "{\"method\":\"login\", \"api_key\":\"" << apiKey << "\", \"id\":\"login\",\"jsonrpc\":\"2.0\"} \n";
 		queueDataSend(json.str());	
 	} else {
 		cout << "Handshake failed: " << error.message() << "\n";
@@ -329,8 +358,11 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 		}
 
 		// Prepare to continue reading
-		boost::asio::async_read_until(*socket, responseBuffer, "\n",
-        	boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
+		if (slushPoolProtocol){
+			boost::asio::async_read_until(*nonSSLsocket, responseBuffer, "\n", boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
+		}else{
+			boost::asio::async_read_until(*SSLsocket, responseBuffer, "\n", boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
+		}
 	}
 }
 
@@ -517,7 +549,7 @@ int beamStratum::nextId(){
 	return jsonId;
 };
 
-beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn, bool poolMiningIn) : res(io_service), context(boost::asio::ssl::context::tls)  {
+beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool poolMiningIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tls)  {
 
 	context.set_options(	  boost::asio::ssl::context::default_workarounds
 				| boost::asio::ssl::context::no_sslv2
