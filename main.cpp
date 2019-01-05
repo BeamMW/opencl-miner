@@ -21,7 +21,7 @@ inline vector<string> split(const string &s, char delim) {
     return split(s, delim, elems);
 }
 
-uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, bool &cpuMine, vector<int32_t> &devices ) {
+uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, bool &cpuMine, vector<int32_t> &devices, bool &force3G ) {
 	bool hostSet = false;
 	bool apiSet = false;
 	
@@ -63,6 +63,10 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 				}
 			}
 
+			if (args[i].compare("--force3G")  == 0) {
+				force3G = true;
+			}
+
 			if (args[i].compare("--enable-cpu")  == 0) {
 				cpuMine = true;
 			}
@@ -100,8 +104,9 @@ int main(int argc, char* argv[]) {
 	bool cpuMine = false;
 	bool useTLS = true;
 	vector<int32_t> devices;
+	bool force3G = false;
 
-	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices);
+	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices, force3G);
 
 	cout << "-====================================-" << endl;
 	cout << "   BEAM Equihash 150/5 OpenCL miner   " << endl;
@@ -135,7 +140,7 @@ int main(int argc, char* argv[]) {
 	cout << "Setup OpenCL devices:" << endl;
 	cout << "=====================" << endl;
 	
-	myClHost.setup(&myStratum, devices, cpuMine);
+	myClHost.setup(&myStratum, devices, cpuMine, force3G);
 
 	cout << endl;
 	cout << "Waiting for work from stratum:" << endl;

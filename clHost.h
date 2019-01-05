@@ -50,7 +50,7 @@ class clHost {
 
 
 	// Functions
-	void detectPlatFormDevices(vector<int32_t>, bool);
+	void detectPlatFormDevices(vector<int32_t>, bool, bool);
 	void loadAndCompileKernel(cl::Device &, uint32_t, bool);
 	void queueKernels(uint32_t, clCallbackData*);
 	
@@ -59,7 +59,7 @@ class clHost {
 
 	public:
 	
-	void setup(beamStratum*, vector<int32_t>, bool);
+	void setup(beamStratum*, vector<int32_t>, bool, bool);
 	void startMining();	
 	void callbackFunc(cl_int, void*);
 };

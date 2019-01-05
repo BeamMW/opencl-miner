@@ -135,7 +135,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 
 
 // Detect the OpenCL hardware on this system
-void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
+void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU, bool force3G) {
 	// read the OpenCL platforms on this system
 	cl::Platform::get(&platforms);  
 
@@ -175,11 +175,14 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 
 			// Check if the device should be selected
 			bool pick = false;
+
 			if (selDev[0] == -1) pick = true;
 			if (selNum < selDev.size()) {
 				if (curDiv == selDev[selNum]) {
 					pick = true;
 					selNum++;
+
+					
 				}				
 			}
 			
@@ -201,7 +204,7 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				}
 				
 
-				if (deviceMemory > needed_4G) {
+				if ((deviceMemory > needed_4G) && (!force3G)) {
 					cout << "   Memory check for 4G kernel passed" << endl;
 					loadAndCompileKernel(nDev[di], pl, false);
 				} else if (deviceMemory > needed_3G) {
@@ -226,9 +229,9 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 
 
 // Setup function called from outside
-void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCPU) {
+void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCPU, bool force3G) {
 	stratum = stratumIn;
-	detectPlatFormDevices(devSel, allowCPU);
+	detectPlatFormDevices(devSel, allowCPU, force3G);
 }
 
 
