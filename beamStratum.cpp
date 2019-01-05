@@ -213,7 +213,7 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					powDiff = beam::Difficulty(stratDiff);
 					updateMutex.unlock();	
 
-					cout << "New work received with id " << workId << " at difficulty " << powDiff.ToFloat() << endl;	
+					cout << "New work received with id " << workId << " at difficulty " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;	
 				}
 
 				// Cancel a running job
