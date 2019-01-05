@@ -47,7 +47,7 @@ void beamStratum::activateWrite() {
 
 		if (slushPoolProtocol){
 			boost::asio::async_write(*nonSSLsocket, requestBuffer,
-				 boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 		
+				 boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 	
 		}else{
 			boost::asio::async_write(*SSLsocket, requestBuffer,
 				 boost::bind(&beamStratum::writeHandler,this, boost::asio::placeholders::error)); 		
@@ -58,6 +58,8 @@ void beamStratum::activateWrite() {
 
 // Once written check if there is more to write
 void beamStratum::writeHandler(const boost::system::error_code& err) {
+	if (slushPoolProtocol) nonSSLsocket->flush();	
+
 	activeWrite = false;
 	activateWrite(); 
 	if (err) {
@@ -314,17 +316,19 @@ void beamStratum::readStratumFromPool(const string& jsonStr) {
 				}
 				break;
 
-			case SUBMITTING:
-				res = j["result"];
+			case AUTHORIZED:
+				if (j["result"].is_null()) {
+					res = j["error"].is_null();
+				}else{
+					res = j["result"];
+				}
 				if (res){
 					cout << "Accept [" << j["id"] << "] " << powDiff.ToFloat() << endl;
 					submitAccept++;
 				}else{
-					cout << "Reject [" << j["id"] << "] " << powDiff.ToFloat() << "(" << j["error"] << ")" << endl;
+					cout << "Reject [" << j["id"] << "] " << powDiff.ToFloat() << " (" << j["error"] << ")" << endl;
 					submitReject++;
 				}
-
-				state = AUTHORIZED;
 				break;
 			default: 
 				cout << "Unkown: " << jsonStr << endl;
@@ -363,6 +367,8 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 		}else{
 			boost::asio::async_read_until(*SSLsocket, responseBuffer, "\n", boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
 		}
+	}else{
+		cout << " read error: " << err.message() << endl;
 	}
 }
 
@@ -513,9 +519,8 @@ void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vecto
 				<< "\", \"output\": \"" << solutionHex.str() << "\", \"jsonrpc\":\"2.0\" } \n";
 	}else{
 		json << "{\"params\": [\"" << apiKey << "\", \"" << wId  <<"\"," 
-			<< "\"" << solutionHex.str() << "\", \"0000\", \"" << nonceHex.str() << "\"], \"id\": 4, "
-			<< "\"method\": \"mining.submit\"}";
-		state = SUBMITTING;
+			<< "\"" << solutionHex.str() << "\", \"0000\", \"" << nonceHex.str() << "\"], \"id\": " << nextId() << ", "
+			<< "\"method\": \"mining.submit\"}" << endl;
 	}
 
 	queueDataSend(json.str());	
