@@ -54,6 +54,8 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	// reading the kernel
 	string progStr = string(__equihash_150_5_cl, __equihash_150_5_cl_len); 
 
+	/* ifstream file("./kernels/equihash_150_5.cl");
+	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>())); */
 	cl::Program::Sources source(1,std::make_pair(progStr.c_str(), progStr.length()+1));
 
 	// Create a program object and build it
@@ -61,7 +63,12 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	devicesTMP.push_back(device);
 
 	cl::Program program(contexts[pl], source);
-	cl_int err = program.build(devicesTMP,"");
+	cl_int err;
+	if (!use3G) {
+		err = program.build(devicesTMP,"");
+	} else {
+		err = program.build(devicesTMP,"-DMEM3G");
+	}
 
 	// Check if the build was Ok
 	if (!err) {
@@ -89,9 +96,12 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 		newKernels.push_back(cl::Kernel(program, "round3", &err));
 		newKernels.push_back(cl::Kernel(program, "round4", &err));
 		newKernels.push_back(cl::Kernel(program, "round5", &err));
-		newKernels.push_back(cl::Kernel(program, "combine", &err));
 		if (use3G) {
+			newKernels.push_back(cl::Kernel(program, "combine3G", &err));
 			newKernels.push_back(cl::Kernel(program, "repack", &err));
+			newKernels.push_back(cl::Kernel(program, "move", &err));
+		} else {
+			newKernels.push_back(cl::Kernel(program, "combine", &err));
 		}
 		kernels.push_back(newKernels);
 
@@ -104,10 +114,11 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err)); 
 			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint2) * 71303168, NULL, &err)); 
 		} else {
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err));
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err)); 
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 54263808, NULL, &err)); 
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 1, NULL, &err)); 
+
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 69599232, NULL, &err));
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 69599232, NULL, &err)); 
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 52199424, NULL, &err)); 
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint2) * 1, NULL, &err)); 
 		}
 
 		newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 256, NULL, &err));   
@@ -177,7 +188,7 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				// Check if the CPU / GPU has enough memory
 				uint64_t deviceMemory = nDev[di].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
 				uint64_t needed_4G = 7* ((uint64_t) 570425344) + 4096 + 196608 + 1296;
-				uint64_t needed_3G = 4* ((uint64_t) 570425344) + ((uint64_t) 868220928) + 4096 + 196608 + 1296;
+				uint64_t needed_3G = 4* ((uint64_t) 556793856) + ((uint64_t) 835190784) + 4096 + 196608 + 1296;
 
 				cout << "   Device reports " << deviceMemory / (1024*1024) << "MByte total memory" << endl;
 
@@ -193,11 +204,11 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				if (deviceMemory > needed_4G) {
 					cout << "   Memory check for 4G kernel passed" << endl;
 					loadAndCompileKernel(nDev[di], pl, false);
-				} /*else if (deviceMemory > needed_3G) {
+				} else if (deviceMemory > needed_3G) {
 					cout << "   Memory check for 3G kernel passed" << endl;
 					loadAndCompileKernel(nDev[di], pl, true);
-				} */ else {
-					cout << "   Memory check failed, required minimum memory: " << needed_4G/(1024*1024) << endl;
+				}  else {
+					cout << "   Memory check failed, required minimum memory: " << needed_3G/(1024*1024) << endl;
 				}
 			} else {
 				cout << "   Device will not be used, it was not included in --devices parameter." << endl;
@@ -301,7 +312,7 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][1].setArg(3, nonce); 
 		kernels[gpuIndex][1].setArg(4, (cl_uint) 0); 
 
-		// Kernel arguments for round1
+		 // Kernel arguments for round1
 		kernels[gpuIndex][2].setArg(0, buffers[gpuIndex][0]); 
 		kernels[gpuIndex][2].setArg(1, buffers[gpuIndex][1]); 
 		kernels[gpuIndex][2].setArg(2, buffers[gpuIndex][2]);  // Index tree will be stored here 
@@ -313,17 +324,21 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
 		kernels[gpuIndex][3].setArg(2, buffers[gpuIndex][5]); 
 
+		// Kernel arguments for move
+		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][1]); 	
+
 		// Kernel arguments for repack
-		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][0]);
-		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][2]);	// Index tree R1 & 2 will be packed here 
+		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][2]); 	// Index tree will be stored here 	
 
 		// Kernel arguments for round3
 		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
 		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
 		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][5]); 
 
-		 // Kernel arguments for round4
+		// Kernel arguments for round4
 		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
 		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]); 	// Index tree will be stored here 
 		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]);  
@@ -336,9 +351,11 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		// Kernel arguments for Combine
 		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
 		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][2]); 	
-		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][4]); 
+		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][4]);  
 		kernels[gpuIndex][7].setArg(3, buffers[gpuIndex][5]); 	
-		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][6]); 
+		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][6]);
+
+		
 
 		cl_int err;
 		// Queue the kernels
@@ -350,9 +367,10 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][1].setArg(4, (cl_uint) 1); 
 		kernels[gpuIndex][2].setArg(4, (cl_uint) 1); 
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(8388608), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(71041024), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(34799616), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(69599232), cl::NDRange(256), NULL, NULL);
 		queues[gpuIndex].flush();
 		
 		
