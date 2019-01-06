@@ -29,6 +29,10 @@ To list all devices that are present in the system and get their order start the
 Then all devices will be listed, but none selected for mining. The miner closes when no devices were 
 selected for mining or all selected miner fail in the compatibility check.
 
+### --force3G (Optional)
+Force the miner to use the 3G implementation even if the GPUs have 4G or more. This can resolve compatibility
+problems with 4G GPUs with screen attached or uncommon memory configurations like Nvidia GTX 970.
+
 # How to build
 ## Windows
 1. Install Visual Studio >= 2017 with CMake support.
