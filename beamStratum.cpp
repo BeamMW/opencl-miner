@@ -350,7 +350,7 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 		try {
 			istringstream jsonStream(response);
 
-			if (!poolMining){
+			if (!slushPoolProtocol){
 				pt::iptree jsonTree;
 				pt::read_json(jsonStream,jsonTree);
 				readStratumFromNode(jsonTree);
