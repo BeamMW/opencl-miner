@@ -34,12 +34,18 @@ namespace beamMiner {
 #ifndef beamMiner_H 
 #define beamMiner_H 
 
+
+enum StratumState {
+	INIT, SUBSCRIBING, AUTHORIZING, AUTHORIZED, SUBMITTING,
+};
+
 class beamStratum {
 	private:
 
 	// Definitions belonging to the physical connection
 	boost::asio::io_service io_service;
-	boost::scoped_ptr< boost::asio::ssl::stream<tcp::socket> > socket;
+	boost::scoped_ptr< boost::asio::ssl::stream<tcp::socket> > SSLsocket;
+	boost::scoped_ptr< boost::asio::buffered_stream<tcp::socket> > nonSSLsocket;
 	tcp::resolver res;
 	boost::asio::streambuf requestBuffer;
 	boost::asio::streambuf responseBuffer;
@@ -50,6 +56,12 @@ class beamStratum {
 	string port;
 	string apiKey;
 	bool debug = true;
+	bool poolMining = false;
+	bool slushPoolProtocol = false;
+	StratumState state = INIT;
+	int submitAccept = 0;
+	int submitReject = 0;
+
 
 	// Storage for received work
 	int64_t workId;
@@ -67,8 +79,13 @@ class beamStratum {
 	std::deque<string> writeRequests;
 
 	// Stratum receiving subsystem
+	void readStratumFromNode(const pt::iptree& jsonTree);
+	void readStratumFromPool(const string& jsonStr);
 	void readStratum(const boost::system::error_code&);
 	boost::mutex updateMutex;
+	boost::mutex jsonIdMutex;
+	int jsonId = 0;
+
 
 	// Connection handling
 	void connect();
@@ -80,8 +97,11 @@ class beamStratum {
 	static bool testSolution(const beam::Difficulty&, const std::vector<uint32_t>&, std::vector<uint8_t>&);
 	void submitSolution(int64_t, uint64_t, const std::vector<uint8_t>&);
 
+	void initNonce();
+	int nextId();
+
 	public:
-	beamStratum(string, string, string, bool);
+	beamStratum(string, string, string, bool, bool);
 	void startWorking();
 
 	struct WorkDescription
