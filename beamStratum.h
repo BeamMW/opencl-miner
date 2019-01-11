@@ -57,6 +57,10 @@ class beamStratum {
 	std::atomic<uint64_t> nonce;
 	beam::Difficulty powDiff;
 	std::vector<uint8_t> poolNonce;
+	// Stat
+	uint64_t sharesAcc = 0;
+	uint64_t sharesRej = 0;
+	time_t t_start, t_current;
 
 	//Stratum sending subsystem
 	bool activeWrite = false;

@@ -55,6 +55,7 @@ void beamStratum::writeHandler(const boost::system::error_code& err) {
 
 // Called by main() function, starts the stratum client thread
 void beamStratum::startWorking(){
+	t_start = time(NULL);
 	std::thread (&beamStratum::connect,this).detach();
 }
 
@@ -191,9 +192,11 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					} else {	// A share reply
 						int32_t code = jsonTree.get<int32_t>("code");
 						if (code == 1) {
-							cout << "Solution for work id " << jsonTree.get<string>("id") << "accepted" << endl;
+							cout << "Solution for work id " << jsonTree.get<string>("id") << " accepted" << endl;
+							sharesAcc++;
 						} else {
-							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << "not accepted" << endl;
+							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << " not accepted" << endl;
+							sharesRej++;
 						}
 					}
 				}
@@ -225,6 +228,9 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					if (id == workId) workId = -1;
 					updateMutex.unlock();
 				}
+				t_current = time(NULL);
+
+				cout << "Solutions (A/R): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 
 			}
 
 			
