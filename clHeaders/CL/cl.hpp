@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wignored-attributes"
 /*******************************************************************************
  * Copyright (c) 2008-2015 The Khronos Group Inc.
  *
