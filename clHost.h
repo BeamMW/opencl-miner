@@ -40,6 +40,7 @@ class clHost {
 
 	// Statistics
 	vector<int> solutionCnt;
+	vector<uint32_t> lastHashrates;
 
 	// To check if a mining thread stoped and we must resume it
 	vector<bool> paused;
@@ -62,6 +63,9 @@ class clHost {
 	void setup(beamStratum*, vector<int32_t>, bool, bool);
 	void startMining();	
 	void callbackFunc(cl_int, void*);
+	
+	std::string getAPIResponse();
+	void startAPI();
 };
 
 }

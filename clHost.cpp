@@ -5,6 +5,8 @@
 
 #include "clHost.h"
 #include "./kernels/equihash_150_5_inc.h"
+#include <thread>
+#include <sys/socket.h>
 
 namespace beamMiner {
 
@@ -86,6 +88,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 		paused.push_back(true);
 		is3G.push_back(use3G);
 		solutionCnt.push_back(0);
+		lastHashrates.push_back(0);
 
 		// Create the kernels
 		vector<cl::Kernel> newKernels;	
@@ -446,7 +449,7 @@ void clHost::startMining() {
 			solutionCnt[i] = 0;
 			totalSols += sol;
 			cout << fixed << setprecision(2) << (double) sol / 15.0 << " sol/s ";
-			
+			lastHashrates[i] = sol;
 		}
 
 		if (devices.size() > 1) cout << "| Total: " << setprecision(2) << (double) totalSols / 15.0 << " sol/s ";
@@ -470,7 +473,59 @@ void clHost::startMining() {
 }
 
 
+std::string clHost::getAPIResponse() {
+	std::ostringstream response;
+	response << "{";
+
+	uint32_t totalHashrate = 0;
+	response << "\"devices\":[";
+	for (int i = 0; i < this->devices.size(); i++) {
+		uint32_t h = lastHashrates[i];
+		totalHashrate += h;
+		if (i != 0) {
+			response << ",";
+		}
+		response << "{";
+		response << "\"hashrate\":";
+		response << std::fixed << std::setprecision(2) << (double)h / 15.0;
+		response << "}";
+	}
+	response << "]";
+
+	response << ",";
+	response << "\"totalHashrate\":";
+	response << std::fixed << std::setprecision(2) << (double)totalHashrate / 15.0;
+
+	response << "}";
+
+	return response.str();
+}
+
+void apiServer(clHost* self) {
+	while (true) {
+
+		int serverSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+		struct sockaddr_in serverAddress;
+		memset(&serverAddress, 0, sizeof(serverAddress));
+		serverAddress.sin_family = AF_INET;
+		serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+		serverAddress.sin_port = htons(4030);
+		bind(serverSocketDescriptor, (struct sockaddr*) &serverAddress, sizeof(serverAddress));
+		listen(serverSocketDescriptor, 5);
+		while (true) {
+			struct sockaddr_in clientAddress;
+			socklen_t addressLength = sizeof(clientAddress);
+			int incomingSocketDescriptor = accept(serverSocketDescriptor, (struct sockaddr*) &clientAddress, &addressLength);
+			std::string response = self->getAPIResponse();
+			send(incomingSocketDescriptor, response.c_str(), response.length(), 0);
+			close(incomingSocketDescriptor);
+		}
+	}
+}
+
+void clHost::startAPI() {
+	thread t1(apiServer, this);
+	t1.detach();
+}
+
 } 	// end namespace
-
-
-
