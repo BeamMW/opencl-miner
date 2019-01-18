@@ -505,21 +505,45 @@ void apiServer(clHost* self) {
 	while (true) {
 
 		int serverSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+		if (serverSocketDescriptor == -1) {
+			perror("creating server socket failed");
+			return;
+		}
+
 		struct sockaddr_in serverAddress;
 		memset(&serverAddress, 0, sizeof(serverAddress));
 		serverAddress.sin_family = AF_INET;
 		serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
 		serverAddress.sin_port = htons(4030);
-		bind(serverSocketDescriptor, (struct sockaddr*) &serverAddress, sizeof(serverAddress));
-		listen(serverSocketDescriptor, 5);
+		if (bind(serverSocketDescriptor, (struct sockaddr*) &serverAddress, sizeof(serverAddress)) != 0) {
+			perror("binding server socket failed");
+			return;
+		}
+
+		if (listen(serverSocketDescriptor, 5) != 0) {
+			perror("listening on server socket failed");
+			return;
+		}
+
 		printf("API listener started on port 4030\n");
+
 		while (true) {
 			struct sockaddr_in clientAddress;
 			socklen_t addressLength = sizeof(clientAddress);
 			int incomingSocketDescriptor = accept(serverSocketDescriptor, (struct sockaddr*) &clientAddress, &addressLength);
+			if (incomingSocketDescriptor == -1) {
+				perror("accept on API socket failed");
+			}
+
 			std::string response = self->getAPIResponse();
-			send(incomingSocketDescriptor, response.c_str(), response.length(), 0);
-			close(incomingSocketDescriptor);
+
+			if (send(incomingSocketDescriptor, response.c_str(), response.length(), 0) == -1) {
+				perror("sending API response failed");
+			}
+
+			if (close(incomingSocketDescriptor) == -1) {
+				perror("closing client socket failed");
+			}
 		}
 	}
 }
