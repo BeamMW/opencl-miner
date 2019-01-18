@@ -512,6 +512,7 @@ void apiServer(clHost* self) {
 		serverAddress.sin_port = htons(4030);
 		bind(serverSocketDescriptor, (struct sockaddr*) &serverAddress, sizeof(serverAddress));
 		listen(serverSocketDescriptor, 5);
+		printf("API listener started on port 4030\n");
 		while (true) {
 			struct sockaddr_in clientAddress;
 			socklen_t addressLength = sizeof(clientAddress);
