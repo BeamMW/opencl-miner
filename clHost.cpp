@@ -509,6 +509,16 @@ void apiServer(clHost* self) {
 			perror("creating server socket failed");
 			return;
 		}
+		
+		int enable = 1;
+		if (setsockopt(serverSocketDescriptor, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1) {
+			perror("unable to set SO_REUSEADDR on API socket");
+			return;
+		}
+		if (setsockopt(serverSocketDescriptor, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) == -1) {
+			perror("unable to set SO_REUSEPORT on API socket");
+			return;
+		}
 
 		struct sockaddr_in serverAddress;
 		memset(&serverAddress, 0, sizeof(serverAddress));
@@ -525,7 +535,7 @@ void apiServer(clHost* self) {
 			return;
 		}
 
-		printf("API listener started on port 4030\n");
+		std::cout << "API listener started on port 4030" << std::endl;
 
 		while (true) {
 			struct sockaddr_in clientAddress;
