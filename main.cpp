@@ -154,6 +154,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	cout << endl;
+	myClHost.startAPI();
 	cout << "Start mining:" << endl;
 	cout << "=============" << endl;
 	myClHost.startMining();
