@@ -96,7 +96,7 @@ void beamStratum::connect() {
 // Once the physical connection is there start a TLS handshake
 void beamStratum::handleConnect(const boost::system::error_code& err, tcp::resolver::iterator endpoint_iterator) {
 	if (!err) {
-	cout << "Connected to node. Starting TLS handshake." << endl;
+	cout << "Node connection: ok" << endl;
 
       	// The connection was successful. Do the TLS handshake
 	socket->async_handshake(boost::asio::ssl::stream_base::client,boost::bind(&beamStratum::handleHandshake, this, boost::asio::placeholders::error));
@@ -126,7 +126,7 @@ void beamStratum::handleHandshake(const boost::system::error_code& error) {
 		boost::asio::async_read_until(*socket, responseBuffer, "\n",
 		boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
 
-		cout << "TLS Handshake sucess" << endl;
+		cout << "TLS Handshake:   ok" << endl;
 		
 		// The connection was successful. Send the login request
 		std::stringstream json;
@@ -195,7 +195,7 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 							cout << "Solution for work id " << jsonTree.get<string>("id") << " accepted" << endl;
 							sharesAcc++;
 						} else {
-							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << " not accepted" << endl;
+							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << " rejected" << endl;
 							sharesRej++;
 						}
 					}
@@ -224,7 +224,7 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 
 					updateMutex.unlock();	
 
-					cout << "New work received with id " << workId << " at difficulty " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;	
+					cout << "New job: " << workId << "  Difficulty: " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;	
 				}
 
 				// Cancel a running job
@@ -238,13 +238,13 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 				}
 				t_current = time(NULL);
 
-				cout << "Solutions (A/R): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 
+				cout << "Solutions (Accepted/Rejected): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 
 			}
 
 			
 
 		} catch(const pt::ptree_error &e) {
-			cout << "Json parse error: " << e.what() << endl; 
+			cout << "Json parse error when reading Stratum node: " << e.what() << endl; 
 		}
 
 		// Prepare to continue reading

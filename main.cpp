@@ -6,6 +6,12 @@
 #include "beamStratum.h"
 #include "clHost.h"
 
+// Defining global variables
+// Set version number alogritm & here
+const string StrVersionNumber = "v1.0.63";
+const string StrVersionDate = "Jan 6th 2019";
+const string alogritm = "Equihash 150,5";
+
 inline vector<string> &split(const string &s, char delim, vector<string> &elems) {
     stringstream ss(s);
     string item;
@@ -76,7 +82,7 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 			}
 	
 			if (args[i].compare("--version")  == 0) {
-				cout << "1.0.63 for BEAM main network (Jan 6th 2019)" << endl;
+				cout << StrVersionNumber << " for BEAM main network " << "(" << StrVersionDate << ")" << endl;
 				exit(0);
 			}
 		}
@@ -109,9 +115,20 @@ int main(int argc, char* argv[]) {
 	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, cpuMine, devices, force3G);
 
 	cout << "-====================================-" << endl;
-	cout << "   BEAM Equihash 150/5 OpenCL miner   " << endl;
-	cout << "        v1.0.63, Jan 6th 2019         " << endl;
+	cout << "                                      " << endl;
+	cout << "      BEAM Equihash OpenCL miner      " << endl;
+	cout << "       version:   " + StrVersionNumber << endl;
+	cout << "       date:      " + StrVersionDate << endl;
+	cout << "       algorithm: " + alogritm << endl;
+	cout << "                                      " << endl;
 	cout << "-====================================-" << endl;
+	cout << "" << endl;	
+	cout << "Parameters: " << endl;
+	cout << " --server:      " << host << ":" << port << endl;	
+	cout << " --key:         " << apiCred << endl;
+	cout << " --enable-cpu:  " << std::boolalpha << cpuMine << endl;
+	cout << " --force3G:     " << std::boolalpha << force3G << endl;	
+	cout << " --debug:       " << std::boolalpha << debug << endl;
 
 	if (parsing != 0) {
 		if (parsing & 0x1) {
@@ -127,6 +144,7 @@ int main(int argc, char* argv[]) {
 		cout << " --server <server>:<port>	The BEAM stratum server and port to connect to (required)" << endl;
 		cout << " --key <key>			The BEAM stratum server API key (required)" << endl;
 		cout << " --devices <numbers>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
+		cout << " --debug			Enable debug mode - verbose information will be displayed" << endl;
 		cout << " --enable-cpu			Enable mining on OpenCL CPU devices" << endl;
 		cout << " --force3G			Force miner to use max 3G for all installed GPUs" << endl;
 		cout << " --version			Prints the version number" << endl;

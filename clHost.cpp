@@ -49,7 +49,7 @@ void CL_CALLBACK CCallbackFunc(cl_event ev, cl_int err , void* data) {
 
 // Function to load the OpenCL kernel and prepare our device for mining
 void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
-	cout << "   Loading and compiling Beam OpenCL Kernel" << endl;
+	cout << "          Beam OpenCL kernel: loading & compiling" << endl;
 
 	// reading the kernel
 	string progStr = string(__equihash_150_5_cl, __equihash_150_5_cl_len); 
@@ -72,7 +72,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 
 	// Check if the build was Ok
 	if (!err) {
-		cout << "   Build sucessfull. " << endl;
+		cout << "          Beam OpenCL kernel: build sucessfully" << endl;
 
 		// Store the device and create a queue for it
 		cl_command_queue_properties queue_prop = 0;  
@@ -193,28 +193,28 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU, bool f
 				uint64_t needed_4G = 7* ((uint64_t) 570425344) + 4096 + 196608 + 1296;
 				uint64_t needed_3G = 4* ((uint64_t) 556793856) + ((uint64_t) 835190784) + 4096 + 196608 + 1296;
 
-				cout << "   Device reports " << deviceMemory / (1024*1024) << "MByte total memory" << endl;
-
+				cout << "          Total memory: " << deviceMemory / (1024*1024) << " MByte" << endl;
+				
 				if ( hasExtension(nDev[di], "cl_amd_device_attribute_query") ) {
 					uint64_t freeDeviceMemory;
 				 	nDev[di].getInfo(0x4039, &freeDeviceMemory);  // CL_DEVICE_GLOBAL_FREE_MEMORY_AMD
 					freeDeviceMemory *= 1024;
-					cout << "   Device reports " << freeDeviceMemory / (1024*1024) << "MByte free memory (AMD)" << endl;
+					cout << "          Free memory:  " << freeDeviceMemory / (1024*1024) << " MByte" << endl;
 					deviceMemory = min<uint64_t>(deviceMemory, freeDeviceMemory);
 				}
 				
 
 				if ((deviceMemory > needed_4G) && (!force3G)) {
-					cout << "   Memory check for 4G kernel passed" << endl;
+					cout << "          Beam OpenCL kernel: using 4 Gbyte" << endl;
 					loadAndCompileKernel(nDev[di], pl, false);
 				} else if (deviceMemory > needed_3G) {
-					cout << "   Memory check for 3G kernel passed" << endl;
+					cout << "          Beam OpenCL kernel: using 3 Gbyte" << endl;
 					loadAndCompileKernel(nDev[di], pl, true);
 				}  else {
 					cout << "   Memory check failed, required minimum memory: " << needed_3G/(1024*1024) << endl;
 				}
 			} else {
-				cout << "   Device will not be used, it was not included in --devices parameter." << endl;
+				cout << "          Device not used. Not included in --devices parameter." << endl;
 			}
 
 			curDiv++; 
