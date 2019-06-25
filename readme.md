@@ -33,6 +33,11 @@ selected for mining or all selected miner fail in the compatibility check.
 Force the miner to use the 3G implementation even if the GPUs have 4G or more. This can resolve compatibility
 problems with 4G GPUs with screen attached or uncommon memory configurations like Nvidia GTX 970.
 
+### --beamHashI (Optional)
+Force the miner to use the (pre fork) BeamHash I. If this is not set the miner will
+a) Switch between BeamHash I and BeamHash II automatically depending on the block height sended over stratum.
+b) Use BeamHash II in case the stratum server did not send the information required.
+
 # How to build
 ## Windows
 1. Install Visual Studio >= 2017 with CMake support.
