@@ -1,7 +1,7 @@
 // BEAM OpenCL Miner
-// OpenCL Mining Sources for Equihash 150/5
-// Copyright 2018 The Beam Team	
-// Copyright 2018 Wilke Trei
+// OpenCL Mining Sources for BeamHash I / II
+// Copyright 2019 The Beam Team	
+// Copyright 2019 Wilke Trei
 
 #ifdef MEM3G
 #define bucketSize 8496
@@ -442,11 +442,296 @@ __kernel void round0(
 }
 
 
+
+#ifdef MEM3G
+__kernel void round0_BH2(
+		__global uint4 * outputLo,
+		__global uint  * counters,
+		ulong4 blockHeader,
+		ulong nonce,
+		uint group ) {
+
+		__global uint2 * outputHi = (__global uint2*) &outputLo[bucketSize << 10];
+
+#else
+__kernel void round0_BH2(
+		__global uint4 * outputLo,
+		__global uint2 * outputHi,
+		__global uint  * counters,
+		ulong4 blockHeader,
+		ulong nonce ) {
+#endif
+
+	uint tId = get_global_id(0);
+
+       	ulong v[16];
+	ulong m[16];
+	m[0] = blockHeader.s0;
+	m[1] = blockHeader.s1;
+	m[2] = blockHeader.s2;
+	m[3] = blockHeader.s3;
+
+	m[4] = nonce;
+	m[5] = (ulong) tId;
+	m[6] = 0;
+	m[7] = 0;
+
+	m[8] = 0;
+	m[9] = 0;
+	m[10] = 0;
+	m[11] = 0;
+	
+	m[12] = 0;
+	m[13] = 0;
+	m[14] = 0;
+	m[15] = 0;
+
+	ulong8 blake_state = initBlake();
+	
+	// init vector v
+	v[0] = blake_state.s0;
+	v[1] = blake_state.s1;
+	v[2] = blake_state.s2;
+	v[3] = blake_state.s3;
+	v[4] = blake_state.s4;
+	v[5] = blake_state.s5;
+	v[6] = blake_state.s6;
+	v[7] = blake_state.s7;
+	v[8] =  blake_iv[0];
+	v[9] =  blake_iv[1];
+	v[10] = blake_iv[2];
+	v[11] = blake_iv[3];
+	v[12] = blake_iv[4];
+	v[13] = blake_iv[5];
+	v[14] = blake_iv[6];
+	v[15] = blake_iv[7];
+	// length of data - 32 byte work + 8 byte nonce + 4 byte index
+	v[12] ^= 44; 
+	v[14] ^= (ulong)-1;
+
+	// round 1
+	gFunc(v[0], v[4], v[8],  v[12], m[0], m[1]);
+	gFunc(v[1], v[5], v[9],  v[13], m[2], m[3]);
+	gFunc(v[2], v[6], v[10], v[14], m[4], m[5]);
+	gFunc(v[3], v[7], v[11], v[15], m[6], m[7]);
+	gFunc(v[0], v[5], v[10], v[15], m[8], m[9]);
+	gFunc(v[1], v[6], v[11], v[12], m[10], m[11]);
+	gFunc(v[2], v[7], v[8],  v[13], m[12], m[13]);
+	gFunc(v[3], v[4], v[9],  v[14], m[14], m[15]);
+	// round 2
+	gFunc(v[0], v[4], v[8],  v[12], m[14], m[10]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[4], m[8]);
+	gFunc(v[2], v[6], v[10], v[14],	m[9], m[15]);
+	gFunc(v[3], v[7], v[11], v[15], m[13], m[6]);
+	gFunc(v[0], v[5], v[10], v[15], m[1], m[12]);
+	gFunc(v[1], v[6], v[11], v[12], m[0], m[2]);
+	gFunc(v[2], v[7], v[8],  v[13], m[11], m[7]);
+	gFunc(v[3], v[4], v[9],  v[14], m[5], m[3]);
+	// round 3
+	gFunc(v[0], v[4], v[8],  v[12], m[11], m[8]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[12], m[0]);
+	gFunc(v[2], v[6], v[10], v[14], m[5], m[2]);
+	gFunc(v[3], v[7], v[11], v[15], m[15], m[13]);
+	gFunc(v[0], v[5], v[10], v[15], m[10], m[14]);
+	gFunc(v[1], v[6], v[11], v[12], m[3], m[6]);
+	gFunc(v[2], v[7], v[8],  v[13], m[7], m[1]);
+	gFunc(v[3], v[4], v[9],  v[14], m[9], m[4]);
+	// round 4
+	gFunc(v[0], v[4], v[8],  v[12], m[7], m[9]);
+	gFunc(v[1], v[5], v[9],  v[13], m[3], m[1]);
+	gFunc(v[2], v[6], v[10], v[14], m[13], m[12]);
+	gFunc(v[3], v[7], v[11], v[15], m[11], m[14]);
+	gFunc(v[0], v[5], v[10], v[15], m[2], m[6]);
+	gFunc(v[1], v[6], v[11], v[12], m[5], m[10]);
+	gFunc(v[2], v[7], v[8],  v[13], m[4], m[0]);
+	gFunc(v[3], v[4], v[9],  v[14], m[15], m[8]);
+	// round 5
+	gFunc(v[0], v[4], v[8],  v[12], m[9], m[0]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[5], m[7]);
+	gFunc(v[2], v[6], v[10], v[14], m[2], m[4]);
+	gFunc(v[3], v[7], v[11], v[15], m[10], m[15]);
+	gFunc(v[0], v[5], v[10], v[15], m[14], m[1]);
+	gFunc(v[1], v[6], v[11], v[12], m[11], m[12]);
+	gFunc(v[2], v[7], v[8],  v[13], m[6], m[8]);
+	gFunc(v[3], v[4], v[9],  v[14], m[3], m[13]);
+	// round 6
+	gFunc(v[0], v[4], v[8],  v[12], m[2], m[12]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[6], m[10]);
+	gFunc(v[2], v[6], v[10], v[14], m[0], m[11]);
+	gFunc(v[3], v[7], v[11], v[15], m[8], m[3]);
+	gFunc(v[0], v[5], v[10], v[15], m[4], m[13]);
+	gFunc(v[1], v[6], v[11], v[12], m[7], m[5]);
+	gFunc(v[2], v[7], v[8],  v[13], m[15], m[14]);
+	gFunc(v[3], v[4], v[9],  v[14], m[1], m[9]);
+	// round 7
+	gFunc(v[0], v[4], v[8],  v[12], m[12], m[5]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[1], m[15]);
+	gFunc(v[2], v[6], v[10], v[14], m[14], m[13]);
+	gFunc(v[3], v[7], v[11], v[15], m[4], m[10]);
+	gFunc(v[0], v[5], v[10], v[15], m[0], m[7]);
+	gFunc(v[1], v[6], v[11], v[12], m[6], m[3]);
+	gFunc(v[2], v[7], v[8],  v[13], m[9], m[2]);
+	gFunc(v[3], v[4], v[9],  v[14], m[8], m[11]);
+	// round 8
+	gFunc(v[0], v[4], v[8],  v[12], m[13], m[11]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[7], m[14]);
+	gFunc(v[2], v[6], v[10], v[14], m[12], m[1]);
+	gFunc(v[3], v[7], v[11], v[15], m[3], m[9]);
+	gFunc(v[0], v[5], v[10], v[15], m[5], m[0]);
+	gFunc(v[1], v[6], v[11], v[12], m[15], m[4]);
+	gFunc(v[2], v[7], v[8],  v[13], m[8], m[6]);
+	gFunc(v[3], v[4], v[9],  v[14], m[2], m[10]);
+	// round 9
+	gFunc(v[0], v[4], v[8],  v[12], m[6], m[15]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[14], m[9]);
+	gFunc(v[2], v[6], v[10], v[14], m[11], m[3]);
+	gFunc(v[3], v[7], v[11], v[15], m[0], m[8]);
+	gFunc(v[0], v[5], v[10], v[15], m[12], m[2]);
+	gFunc(v[1], v[6], v[11], v[12], m[13], m[7]);
+	gFunc(v[2], v[7], v[8],  v[13], m[1], m[4]);
+	gFunc(v[3], v[4], v[9],  v[14], m[10], m[5]);
+	// round 10
+	gFunc(v[0], v[4], v[8],  v[12], m[10], m[2]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[8], m[4]);
+	gFunc(v[2], v[6], v[10], v[14], m[7], m[6]);
+	gFunc(v[3], v[7], v[11], v[15], m[1], m[5]);
+	gFunc(v[0], v[5], v[10], v[15], m[15], m[11]);
+	gFunc(v[1], v[6], v[11], v[12], m[9], m[14]);
+	gFunc(v[2], v[7], v[8],  v[13], m[3], m[12]);
+	gFunc(v[3], v[4], v[9],  v[14], m[13], m[0]);
+	// round 11
+	gFunc(v[0], v[4], v[8],  v[12], m[0], m[1]);
+	gFunc(v[1], v[5], v[9],  v[13], m[2], m[3]);
+	gFunc(v[2], v[6], v[10], v[14], m[4], m[5]);
+	gFunc(v[3], v[7], v[11], v[15], m[6], m[7]);
+	gFunc(v[0], v[5], v[10], v[15], m[8], m[9]);
+	gFunc(v[1], v[6], v[11], v[12], m[10], m[11]);
+	gFunc(v[2], v[7], v[8],  v[13], m[12], m[13]);
+	gFunc(v[3], v[4], v[9],  v[14], m[14], m[15]);
+	// round 12
+	gFunc(v[0], v[4], v[8],  v[12], m[14], m[10]);		
+	gFunc(v[1], v[5], v[9],  v[13], m[4], m[8]);
+	gFunc(v[2], v[6], v[10], v[14],	m[9], m[15]);
+	gFunc(v[3], v[7], v[11], v[15], m[13], m[6]);
+	gFunc(v[0], v[5], v[10], v[15], m[1], m[12]);
+	gFunc(v[1], v[6], v[11], v[12], m[0], m[2]);
+	gFunc(v[2], v[7], v[8],  v[13], m[11], m[7]);
+	gFunc(v[3], v[4], v[9],  v[14], m[5], m[3]);
+
+        v[0] = v[0] ^ blake_state.s0 ^ v[8];
+        v[1] = v[1] ^ blake_state.s1 ^ v[9];
+        v[2] = v[2] ^ blake_state.s2 ^ v[10];
+        v[3] = v[3] ^ blake_state.s3 ^ v[11];
+        v[4] = v[4] ^ blake_state.s4 ^ v[12];
+        v[5] = v[5] ^ blake_state.s5 ^ v[13];
+        v[6] = v[6] ^ blake_state.s6 ^ v[14];
+	v[7] = v[7] ^ blake_state.s7 ^ v[15]; 
+
+	uint8 output;
+	uint pos;
+	uint bucket;
+
+	__local uint dataShare[4096];						// prepare for pipeline change
+
+	uint lId = get_local_id(0);
+
+	for (uint i=0; i<8; i++) {
+		dataShare[16*lId+2*i+0] = v[i] ; 
+		dataShare[16*lId+2*i+1] = v[i] >> 32; 		
+	}									// Now all data of the block is shared
+	
+	barrier(CLK_LOCAL_MEM_FENCE); 						// Barrier is only needed for CPU mining, can be removed on modern GPUs
+		
+	uint v2[15];								// Only need first 15 words
+	uint start = lId & 0xF0; 						// Get rid of lower 4 bit
+
+	for (uint i=0; i<15; i++) {
+		v2[i] = 0;
+		for (uint j = start; j<=lId; j++) v2[i] += dataShare[16*j + i];
+		v2[i] = swapBitOrder(v2[i]);
+	}				
+
+	output.s0 = v2[0]; 							// First element are bytes 0 to 18 
+	output.s1 = v2[1];
+	output.s2 = v2[2]; 
+	output.s3 = v2[3];
+	output.s4 = v2[4] & 0x3FFFFF;  	  					// Only lower 22 bits  
+	output.s5 = (tId << 1) + tId; 
+	/*
+	  	We will sort the element into 2^10 
+		buckets of maximal size "bucketSize"
+	*/
+	bucket = (output.s0 >> 6) & 0x3FF;					// BeamHash II mod		
+
+	pos = atomic_inc(&counters[bucket]);
+	output = shr_5(output,16);
+		
+	if (pos < bucketSize) {
+		outputLo[bucket*bucketSize+pos] = output.lo;
+		outputHi[bucket*bucketSize+pos] = output.s45;
+	}
+	 
+
+		
+		
+	output.s0 = (v2[4] >> 24) | (v2[5] << 8); 				// Second element are bytes 19 to 37 
+	output.s1 = (v2[5] >> 24) | (v2[6] << 8);
+	output.s2 = (v2[6] >> 24) | (v2[7] << 8);
+	output.s3 = (v2[7] >> 24) | (v2[8] << 8);
+	output.s4 = ((v2[8] >> 24) | (v2[9] << 8)) & 0x3FFFFF;			// Only lower 22 bits 
+	output.s5++; 
+
+	bucket = (output.s0 >> 6) & 0x3FF;					// BeamHash II mod		
+
+	pos = atomic_inc(&counters[bucket]);
+	output = shr_5(output,16);
+		
+	if (pos < bucketSize) {
+		outputLo[bucket*bucketSize+pos] = output.lo;
+		outputHi[bucket*bucketSize+pos] = output.s45;
+	}
+
+
+	output.s0 = (v2[9] >> 16) | (v2[10] << 16);  				// Third element are bytes 38 to 56
+	output.s1 = (v2[10] >> 16) | (v2[11] << 16);
+	output.s2 = (v2[11] >> 16) | (v2[12] << 16);
+	output.s3 = (v2[12] >> 16) | (v2[13] << 16);
+	output.s4 = ((v2[13] >> 16) | (v2[14] << 16)) & 0x3FFFFF;		// Only lower 22 bits 
+	output.s5++; 
+				
+	bucket = (output.s0 >> 6) & 0x3FF;					// BeamHash II mod		
+
+	pos = atomic_inc(&counters[bucket]);
+	output = shr_5(output,16);
+		
+	if (pos < bucketSize) {
+		outputLo[bucket*bucketSize+pos] = output.lo;
+		outputHi[bucket*bucketSize+pos] = output.s45;
+	}
+}
+
+
 void masking6(uint4 input0, uint2 input1, __local uint* scratch, __local uint* tab , __local uint* cnt, uint mask) {
 	if ((input0.s0 & 0x7) == mask) {
 		uint pos = atomic_inc(&cnt[0]);
 		if (pos < 1216) {
 			uint value  = atomic_xchg(&tab[(input0.s0 >> 3) & 0x1FF], pos); 
+			scratch[pos]      = input0.s0;	
+			scratch[1216+pos] = input0.s1;
+			scratch[2432+pos] = input0.s2;
+			scratch[3648+pos] = input0.s3;
+			scratch[4864+pos] = input1.s0 | (value << 16);	// Saving space in round 1
+			scratch[6080+pos] = input1.s1;
+		}
+	}
+}
+
+
+void masking6_BH2(uint4 input0, uint2 input1, __local uint* scratch, __local uint* tab , __local uint* cnt, uint mask) {
+	if ((input0.s0 & 0x7) == mask) {
+		uint pos = atomic_inc(&cnt[0]);
+		if (pos < 1216) {
+			uint value  = atomic_xchg(&tab[(input0.s0 >> 3) & 0x3F], pos); 	// Only need 3+6 = 9 bit for matching in BeamHash II
 			scratch[pos]      = input0.s0;	
 			scratch[1216+pos] = input0.s1;
 			scratch[2432+pos] = input0.s2;
@@ -626,6 +911,152 @@ __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round1 (				// Ro
 }  
 
 
+
+#ifdef MEM3G
+__kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round1_BH2 (				// Round 1
+		__global uint4 * input0,
+		__global uint4 * output0,
+		__global uint2 * output1,
+		__global uint * counters,
+		uint inGrp) {
+
+	__global uint2 * input1 = (__global uint2*) &input0[bucketSize << 10];
+#else
+__kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round1_BH2 (				// Round 1
+		__global uint4 * input0,
+		__global uint2 * input1,
+		__global uint4 * output0,
+		__global uint2 * output1,
+		__global uint * counters) {
+#endif 
+
+	uint lId = get_local_id(0);
+	uint grp = get_group_id(0); 
+
+	uint bucket = grp >> 3;
+	uint mask = (grp & 7);
+
+	__local uint scratch[7296];
+	
+	__local uint * scratch0 = &scratch[0];
+	__local uint * scratch1 = &scratch[1216];
+	__local uint * scratch2 = &scratch[2432];
+	__local uint * scratch3 = &scratch[3648];
+	__local uint * scratch4 = &scratch[4864];
+	__local uint * scratch5 = &scratch[6080];
+
+	__local uint tab[64];
+	__local uint iCNT[2];
+
+	__global uint * inCounter = &counters[0];
+	__global uint * outCounter = &counters[8192];
+
+	if (lId == 0) {
+		iCNT[1] = 0;
+		iCNT[0] = min(inCounter[bucket],(uint) bucketSize);
+	} 
+
+	if (lId < 64) tab[lId] = 0xFFF;
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	uint ofs = (bucket & r1Mask)*bucketSize;	
+
+	masking6_BH2(input0[ofs+lId], input1[ofs+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+256+lId], input1[ofs+256+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+512+lId], input1[ofs+512+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+768+lId], input1[ofs+768+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+1024+lId], input1[ofs+1024+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+1280+lId], input1[ofs+1280+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+1536+lId], input1[ofs+1536+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+1792+lId], input1[ofs+1792+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+2048+lId], input1[ofs+2048+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+2304+lId], input1[ofs+2304+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+2560+lId], input1[ofs+2560+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+2816+lId], input1[ofs+2816+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+3072+lId], input1[ofs+3072+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+3328+lId], input1[ofs+3328+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+3584+lId], input1[ofs+3584+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+3840+lId], input1[ofs+3840+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+4096+lId], input1[ofs+4096+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+4352+lId], input1[ofs+4352+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+4608+lId], input1[ofs+4608+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+4864+lId], input1[ofs+4864+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+5120+lId], input1[ofs+5120+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+5376+lId], input1[ofs+5376+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+5632+lId], input1[ofs+5632+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+5888+lId], input1[ofs+5888+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+6144+lId], input1[ofs+6144+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+6400+lId], input1[ofs+6400+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+6656+lId], input1[ofs+6656+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	masking6_BH2(input0[ofs+6912+lId], input1[ofs+6912+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	masking6_BH2(input0[ofs+7168+lId], input1[ofs+7168+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	if ((lId + 7424) < iCNT[0]) masking6_BH2(input0[ofs+7424+lId], input1[ofs+7424+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	if ((lId + 7680) < iCNT[0]) masking6_BH2(input0[ofs+7680+lId], input1[ofs+7680+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	if ((lId + 7936) < iCNT[0]) masking6_BH2(input0[ofs+7936+lId], input1[ofs+7936+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+
+	if ((lId + 8192) < iCNT[0]) masking6_BH2(input0[ofs+8192+lId], input1[ofs+8192+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+	if ((lId + 8448) < iCNT[0]) masking6_BH2(input0[ofs+8448+lId], input1[ofs+8448+lId], &scratch[0], &tab[0], &iCNT[1], mask);
+		
+	barrier(CLK_LOCAL_MEM_FENCE);	
+
+	uint inLim = min(iCNT[1], (uint) 1216);
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	uint ownPos = lId;
+	uint own = scratch4[ownPos];
+	uint othPos = own >> 16;
+	uint buck, pos;
+	uint cnt=0;
+
+	uint8 outputEl;
+	
+	while (ownPos < inLim) {
+		uint addr = (othPos < inLim) ? othPos : ownPos+256;
+		uint elem = scratch4[addr];
+		
+		if (othPos < inLim) {
+			outputEl.s0 = scratch0[ownPos] ^ scratch0[othPos];	
+
+			buck = (outputEl.s0 >> 9) & 0x1FFF;			
+			pos = atomic_inc(&outCounter[buck]);
+
+			outputEl.s1 = scratch1[ownPos] ^ scratch1[othPos];	
+			outputEl.s2 = scratch2[ownPos] ^ scratch2[othPos];	
+			outputEl.s3 = scratch3[ownPos] ^ scratch3[othPos];
+			outputEl.s4 = (own^elem) & 0x1FF;
+
+			outputEl = shr_5(outputEl,22); 			// Shift away 9 + 13 bits
+			outputEl.s4 = scratch5[ownPos];
+			outputEl.s5 = scratch5[othPos];
+
+			if (pos < bucketSize) {
+				pos += buck*bucketSize;
+				output0[pos] = outputEl.lo;
+				output1[pos] = outputEl.s45; 
+			}
+			
+		} else { 
+			own = elem;
+			ownPos += 256;
+		}
+
+		othPos = (elem >> 16);
+		ownPos = (cnt<100) ? ownPos : inLim;
+		cnt++;
+	} 
+
+}  
+
+
 __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round2 (				// Round 2
 		__global uint4 * input0,
 		__global uint4 * output0,
@@ -650,6 +1081,8 @@ __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round2 (				// Ro
 
 	__global uint * inCounter = &counters[8192];
 	__global uint * outCounter = &counters[16384];
+
+	//if (get_global_id(0) == 0) printf("Test R1: %d %d \n", inCounter[0], inCounter[1]);
 
 	if (lId == 0) {
 		iCNT[1] = 0;
@@ -794,6 +1227,8 @@ __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round3 (				// Ro
 	__global uint * inCounter = &counters[16384];
 	__global uint * outCounter = &counters[24576];
 
+	// if (get_global_id(0) == 0) printf("Test R2: %d %d \n", inCounter[0], inCounter[1]);
+
 	if (lId == 0) {
 		iCNT[1] = 0;
 		iCNT[0] = min(inCounter[bucket],(uint) bucketSize);
@@ -930,6 +1365,8 @@ __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round4 (				// Ro
 	__global uint * inCounter = &counters[24576];
 	__global uint * outCounter = &counters[32768];
 
+	// if (get_global_id(0) == 0) printf("Test R3: %d %d \n", inCounter[0], inCounter[1]);
+
 	if (lId == 0) {
 		iCNT[1] = 0;
 		iCNT[0] = min(inCounter[bucket],(uint) bucketSize);
@@ -1065,6 +1502,8 @@ __kernel __attribute__((reqd_work_group_size(256, 1, 1))) void round5 (				// Ro
 
 	__global uint * inCounter = &counters[32768];
 	__global uint * outCounter = &counters[40960];
+	
+	// if (get_global_id(0) == 0) printf("Test R4: %d %d \n", inCounter[0], inCounter[1]);
 
 	if (lId == 0) {
 		iCNT[1] = 0;
@@ -1184,6 +1623,8 @@ __kernel __attribute__((reqd_work_group_size(16, 1, 1))) void combine3G (				// 
 
 	__global uint * inCounter = &counters[40960];
 	__global uint * outCounters = (__global uint*) &results[0];
+
+	// if (get_global_id(0) == 0) printf("Test R5: %d %d \n", inCounter[0], inCounter[1]);
 
 	__local uint scratch0[32];
 	__local uint scratch1[32];
@@ -1356,6 +1797,8 @@ __kernel __attribute__((reqd_work_group_size(16, 1, 1))) void combine (				// Co
 
 	__global uint * inCounter = &counters[40960];
 	__global uint * outCounters = (__global uint*) &results[0];
+
+	//	if (get_global_id(0) == 0) printf("Test R5: %d %d \n", inCounter[0], inCounter[1]);
 
 	__local uint scratch0[32];
 	__local uint scratch1[32];

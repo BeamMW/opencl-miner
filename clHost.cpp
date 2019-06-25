@@ -4,7 +4,7 @@
 // Copyright 2018 Wilke Trei
 
 #include "clHost.h"
-#include "./kernels/equihash_150_5_inc.h"
+#include "./kernels/beamHash.h"
 
 namespace beamMiner {
 
@@ -52,7 +52,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	cout << "          Beam OpenCL kernel: loading & compiling" << endl;
 
 	// reading the kernel
-	string progStr = string(__equihash_150_5_cl, __equihash_150_5_cl_len); 
+	string progStr = string((const char*) __beamHash_cl, __beamHash_cl_len); 
 
 	/* ifstream file("./kernels/equihash_150_5.cl");
 	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>())); */
@@ -90,8 +90,13 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 		// Create the kernels
 		vector<cl::Kernel> newKernels;	
 		newKernels.push_back(cl::Kernel(program, "clearCounter", &err));
+
 		newKernels.push_back(cl::Kernel(program, "round0", &err));
 		newKernels.push_back(cl::Kernel(program, "round1", &err));
+
+		newKernels.push_back(cl::Kernel(program, "round0_BH2", &err));
+		newKernels.push_back(cl::Kernel(program, "round1_BH2", &err));
+		
 		newKernels.push_back(cl::Kernel(program, "round2", &err));
 		newKernels.push_back(cl::Kernel(program, "round3", &err));
 		newKernels.push_back(cl::Kernel(program, "round4", &err));
@@ -229,9 +234,10 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU, bool f
 
 
 // Setup function called from outside
-void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCPU, bool force3G) {
+void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool _beamHashI, bool force3G) {
 	stratum = stratumIn;
-	detectPlatFormDevices(devSel, allowCPU, force3G);
+	fbeamHashI = _beamHashI;
+	detectPlatFormDevices(devSel, false, force3G);
 }
 
 
@@ -263,46 +269,66 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][2].setArg(3, buffers[gpuIndex][3]); 	// Index tree will be stored here
 		kernels[gpuIndex][2].setArg(4, buffers[gpuIndex][5]); 
 
-		// Kernel arguments for round2
-		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		// Kernel arguments for round0-BH2
+		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][2]); 
 		kernels[gpuIndex][3].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][3].setArg(3, work); 
+		kernels[gpuIndex][3].setArg(4, nonce); 
+
+		// Kernel arguments for round1-BH2
+		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][4].setArg(3, buffers[gpuIndex][3]); 	// Index tree will be stored here
+		kernels[gpuIndex][4].setArg(4, buffers[gpuIndex][5]); 
+
+		// Kernel arguments for round2
+		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for round3
-		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
-		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
+		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for round4
-		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][2]); 	// Index tree will be stored here 
-		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][2]); 	// Index tree will be stored here 
+		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for round5
-		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
-		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
+		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for Combine
-		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][1]); 	
-		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][7].setArg(3, buffers[gpuIndex][3]); 	
-		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][4]); 
-		kernels[gpuIndex][7].setArg(5, buffers[gpuIndex][5]); 	
-		kernels[gpuIndex][7].setArg(6, buffers[gpuIndex][6]);
+		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][1]); 	
+		kernels[gpuIndex][9].setArg(2, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][9].setArg(3, buffers[gpuIndex][3]); 	
+		kernels[gpuIndex][9].setArg(4, buffers[gpuIndex][4]); 
+		kernels[gpuIndex][9].setArg(5, buffers[gpuIndex][5]); 	
+		kernels[gpuIndex][9].setArg(6, buffers[gpuIndex][6]);
 
 		cl_int err;
 		// Queue the kernels
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][0], cl::NDRange(0), cl::NDRange(12288), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+
+		if (fbeamHashI || workData->wd.forceBeamHashI) {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		} else {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(2796032), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(2097152), cl::NDRange(256), NULL, NULL);
+		}
 		queues[gpuIndex].flush();
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][5], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][6], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL);
 	} else {	// Starting the 3G kernels
 		// Kernel arguments for cleanCounter
 		kernels[gpuIndex][0].setArg(0, buffers[gpuIndex][5]); 
@@ -322,65 +348,83 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][2].setArg(3, buffers[gpuIndex][5]); 
 		kernels[gpuIndex][2].setArg(4, (cl_uint) 0); 
 
+		// Kernel arguments for round0-BH2
+		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][3].setArg(2, work); 
+		kernels[gpuIndex][3].setArg(3, nonce); 
+		kernels[gpuIndex][3].setArg(4, (cl_uint) 0); 
+
+		 // Kernel arguments for round1-BH2
+		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][2]);  // Index tree will be stored here 
+		kernels[gpuIndex][4].setArg(3, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][4].setArg(4, (cl_uint) 0); 
+
 		// Kernel arguments for round2
-		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
-		kernels[gpuIndex][3].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for move
-		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][1]); 	
+		kernels[gpuIndex][11].setArg(0, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][11].setArg(1, buffers[gpuIndex][1]); 	
 
 		// Kernel arguments for repack
-		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][2]); 	// Index tree will be stored here 	
+		kernels[gpuIndex][10].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][10].setArg(1, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][10].setArg(2, buffers[gpuIndex][2]); 	// Index tree will be stored here 	
 
 		// Kernel arguments for round3
-		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
-		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
+		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for round4
-		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]); 	// Index tree will be stored here 
-		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][0]); 	// Index tree will be stored here 
+		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for round5
-		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
-		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
+		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for Combine
-		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][2]); 	
-		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][4]);  
-		kernels[gpuIndex][7].setArg(3, buffers[gpuIndex][5]); 	
-		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][6]);
-
-		
+		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][2]); 	
+		kernels[gpuIndex][9].setArg(2, buffers[gpuIndex][4]);  
+		kernels[gpuIndex][9].setArg(3, buffers[gpuIndex][5]); 	
+		kernels[gpuIndex][9].setArg(4, buffers[gpuIndex][6]);
 
 		cl_int err;
 		// Queue the kernels
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][0], cl::NDRange(0), cl::NDRange(12288), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
-		queues[gpuIndex].flush();
+
+		if (fbeamHashI || workData->wd.forceBeamHashI) {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
+			queues[gpuIndex].flush();
+			
+			kernels[gpuIndex][1].setArg(4, (cl_uint) 1); 
+			kernels[gpuIndex][2].setArg(4, (cl_uint) 1); 
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
+		} else {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(2796032), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(2097152), cl::NDRange(256), NULL, NULL);
+		}
 		
-		kernels[gpuIndex][1].setArg(4, (cl_uint) 1); 
-		kernels[gpuIndex][2].setArg(4, (cl_uint) 1); 
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(34799616), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(69599232), cl::NDRange(256), NULL, NULL);
-		queues[gpuIndex].flush();
-		
-		
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][5], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][11], cl::NDRange(0), cl::NDRange(34799616), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][10], cl::NDRange(0), cl::NDRange(69599232), cl::NDRange(256), NULL, NULL);
+		queues[gpuIndex].flush();
+		
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][6], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL); 
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL); 
 	}
 
 	
@@ -394,6 +438,7 @@ void clHost::callbackFunc(cl_int err , void* data){
 
 	// Read the number of solutions of the last iteration
 	uint32_t solutions = results[gpu][0];
+
 	for (uint32_t  i=0; i<solutions; i++) {
 		vector<uint32_t> indexes;
 		indexes.assign(32,0);

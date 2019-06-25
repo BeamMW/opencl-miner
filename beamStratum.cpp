@@ -185,6 +185,10 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 							} else {
 								poolNonce.clear();
 							}
+
+							if (jsonTree.count("forkheight") > 0) {
+								forkHeight = jsonTree.get<uint64_t>("forkheight");
+							}
 						} else {
 							cout << "Error: Login at node not accepted. Closing miner." << endl;
 							exit(0);
@@ -221,10 +225,17 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 						poolNonce = parseHex(poolNonceStr);
 					}
 
+					// Block Height for fork detection
+					if (jsonTree.count("height") > 0) {
+						blockHeight = jsonTree.get<uint64_t>("height");
+						if (blockHeight == forkHeight) cout << "-= PoW fork height reached. Switching algorithm =-" << endl;
+					}
+
 
 					updateMutex.unlock();	
 
-					cout << "New job: " << workId << "  Difficulty: " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;	
+					cout << "New job: " << workId << "  Difficulty: " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;
+					cout << "Solutions (Accepted/Rejected): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 	
 				}
 
 				// Cancel a running job
@@ -237,8 +248,6 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					updateMutex.unlock();
 				}
 				t_current = time(NULL);
-
-				cout << "Solutions (Accepted/Rejected): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 
 			}
 
 			
@@ -279,6 +288,10 @@ void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 
 	wd.workId = workId;
 	wd.powDiff = powDiff;
+
+	uint64_t limit = numeric_limits<uint64_t>::max();
+	wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
+
 	memcpy(dataOut, serverWork.data(), 32);
 
 	updateMutex.unlock();

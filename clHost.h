@@ -37,6 +37,7 @@ class clHost {
 	vector< vector<cl::Kernel> > kernels;
 
 	vector<bool> is3G;
+	bool fbeamHashI = false;
 
 	// Statistics
 	vector<int> solutionCnt;
