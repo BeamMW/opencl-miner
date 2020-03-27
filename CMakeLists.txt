@@ -59,10 +59,9 @@ set (HEADERS
 )
 
 set(MINER_SRC
-    beamStratum.cpp
-    clHost.cpp
     main.cpp
     crypto/sha256.c
+    crypto/blake2b.cpp
     beam/core/difficulty.cpp
     beam/core/uintBig.cpp
     beam/utility/common.cpp
@@ -72,6 +71,16 @@ add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHeaders)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHost)
+
+add_subdirectory(solvers)
+target_link_libraries(${TARGET_NAME} solvers)
+
+add_subdirectory(clHost)
+target_link_libraries(${TARGET_NAME} clHost)
+
+add_subdirectory(stratum)
+target_link_libraries(${TARGET_NAME} stratum)
 
 if(UNIX)
     find_package(Threads)

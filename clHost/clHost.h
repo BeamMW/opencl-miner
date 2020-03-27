@@ -1,7 +1,7 @@
 // BEAM OpenCL Miner
 // OpenCL Host Interface
-// Copyright 2018 The Beam Team	
-// Copyright 2018 Wilke Trei
+// Copyright 2020 The Beam Team	
+// Copyright 2020 Wilke Trei
 
 #include <CL/cl.hpp>
 #include <iostream>
@@ -13,31 +13,24 @@
 #include <cstdlib>
 #include <climits>
 
+#include "beamSolvers.h"
 #include "beamStratum.h"
+
+#ifndef beamMiner_H 
+#define beamMiner_H 
 
 namespace beamMiner {
 
-struct clCallbackData {
-	void* host;
-	uint32_t gpuIndex;
-	beamStratum::WorkDescription wd;
-};
 
 class clHost {
 	private:
 	// OpenCL 
 	vector<cl::Platform> platforms;  
 	vector<cl::Context> contexts;
-	vector<cl::CommandQueue> queues;
 	vector<cl::Device> devices;
 	vector<cl::Event> events;
-	vector<unsigned*> results;
-
-	vector< vector<cl::Buffer> > buffers;
-	vector< vector<cl::Kernel> > kernels;
-
-	vector<bool> is3G;
-	bool fbeamHashI = false;
+	vector<cl::CommandQueue> queues;
+	vector< uint32_t > deviceContext;
 
 	// Statistics
 	vector<int> solutionCnt;
@@ -49,20 +42,21 @@ class clHost {
 	vector<clCallbackData> currentWork;
 	bool restart = true;
 
-
 	// Functions
-	void detectPlatFormDevices(vector<int32_t>, bool, bool);
-	void loadAndCompileKernel(cl::Device &, uint32_t, bool);
-	void queueKernels(uint32_t, clCallbackData*);
+	void detectPlatFormDevices(vector<int32_t>, bool);
 	
 	// The connector
 	beamStratum* stratum;
 
+	beamHashIII_S BeamHashIII;
+
 	public:
 	
-	void setup(beamStratum*, vector<int32_t>, bool, bool);
+	void setup(beamStratum*, vector<int32_t>);
 	void startMining();	
 	void callbackFunc(cl_int, void*);
 };
 
 }
+
+#endif

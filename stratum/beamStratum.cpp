@@ -6,6 +6,7 @@
 
 #include "beamStratum.h"
 #include "crypto/sha256.c"
+#include "crypto/blake2b.h"
 
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
@@ -269,8 +270,22 @@ bool beamStratum::hasWork() {
 }
 
 
+void beamStratum::Blake2B_BeamIII(WorkDescription * wd) {
+	blake2bInstance blakeInst;
+	blakeInst.init(32,448,5, "Beam-PoW");
+
+	uint8_t msg[128] = {0};
+	memcpy(&msg[0], (uint8_t *) &wd->work, 32);
+	memcpy(&msg[32], (uint8_t *) &wd->nonce, 8);
+	memcpy(&msg[40], &extraNonce[0], 4);
+
+	blakeInst.update(&msg[0], 44, 1);	
+	blakeInst.ret_final((uint8_t*) &wd->work, 32);		
+}
+
+
 // function the clHost class uses to fetch new work
-void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
+void beamStratum::getWork(WorkDescription& wd, solverType * solver) {
 
 	// nonce is atomic, so every time we call this will get a nonce increased by one
 	uint64_t cliNonce = nonce.fetch_add(1);
@@ -290,9 +305,15 @@ void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 	wd.powDiff = powDiff;
 
 	uint64_t limit = numeric_limits<uint64_t>::max();
-	wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
+	//wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
+	*solver = BeamIII;
+	wd.solver = BeamIII;
+	
+	memcpy(wd.work, serverWork.data(), 32);
 
-	memcpy(dataOut, serverWork.data(), 32);
+	if (*solver = BeamIII) {
+		Blake2B_BeamIII(&wd);
+	}
 
 	updateMutex.unlock();
 }
@@ -376,10 +397,65 @@ std::vector<unsigned char> GetMinimalFromIndices(std::vector<uint32_t> indices, 
 	return ret;
 }
 
+std::vector<uint8_t> beamStratum::packBeamIII(std::vector<uint32_t> &solverOutput) {
+	std::bitset<800> inStream;
+	std::bitset<800> mask(0xFF);
+
+	inStream.reset();
+	inStream |= (solverOutput[28] & 0xFFFF);
+
+	for (int32_t i = 27; i>=16; i--) {
+		inStream = (inStream << 32);
+		inStream |= solverOutput[i];
+	}
+
+	inStream = (inStream << 16);
+	inStream |= (solverOutput[12] & 0xFFFF);
+
+	for (int32_t i = 11; i>=0; i--) {
+		inStream = (inStream << 32);
+		inStream |= solverOutput[i];
+	}
+
+
+	std::vector<uint8_t> res;
+	for (uint32_t i=0; i<100; i++) {
+		res.push_back((uint8_t) (inStream & mask).to_ulong() );
+		inStream = (inStream >> 8);
+	}
+
+
+	// Adding the extra nonce
+	for (uint32_t i=0; i<4; i++) res.push_back(extraNonce[i]);
+
+	return res;
+	
+}
+
+
+std::vector<uint32_t> GetIndicesFromMinimal(std::vector<uint8_t> soln) {
+	std::bitset<800> inStream;
+	std::bitset<800> mask((1 << (24+1))-1);
+
+	inStream.reset();
+	for (int32_t i = 99; i>=0; i--) {
+		inStream = (inStream << 8);
+		inStream |= (uint64_t) soln[i];
+	}
+
+	std::vector<uint32_t> res;
+	for (uint32_t i=0; i<32; i++) {
+		res.push_back((uint32_t) (inStream & mask).to_ulong() );
+		inStream = (inStream >> (24+1));
+	}
+
+	return res;
+}
+
+
 bool beamStratum::testSolution(const beam::Difficulty& diff, const vector<uint32_t>& indices, vector<uint8_t>& compressed) {
 
 	// get the compressed representation of the solution and check against target
-	compressed = GetMinimalFromIndices(indices,25);
 
 	beam::uintBig_t<32> hv;
 	Sha256_Onestep(compressed.data(), compressed.size(), hv.m_pData);
@@ -420,6 +496,13 @@ void beamStratum::submitSolution(int64_t wId, uint64_t nonceIn, const std::vecto
 void beamStratum::handleSolution(const WorkDescription& wd, vector<uint32_t> &indices) {
 
 	std::vector<uint8_t> compressed;
+
+	if (wd.solver == BeamIII) {
+		compressed = packBeamIII(indices);
+	} else {
+		compressed = GetMinimalFromIndices(indices,25);
+	}
+
 	if (testSolution(wd.powDiff, indices, compressed))
 		std::thread (&beamStratum::submitSolution,this,wd.workId,wd.nonce,std::move(compressed)).detach();
 }

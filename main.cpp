@@ -7,8 +7,8 @@
 #include "clHost.h"
 
 // Defining global variables
-const string StrVersionNumber = "v1.1.0";
-const string StrVersionDate = "Jun 25th 2019";
+const string StrVersionNumber = "v2.0";
+const string StrVersionDate = "Mar 25th 2020";
 
 inline vector<string> &split(const string &s, char delim, vector<string> &elems) {
     stringstream ss(s);
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 
 	cout << "-====================================-" << endl;
 	cout << "                                      " << endl;
-	cout << "      BeamHash I / II OpenCL Miner      " << endl;
+	cout << "       BeamHash III OpenCL Miner      " << endl;
 	cout << "       version:   " + StrVersionNumber << endl;
 	cout << "       date:      " + StrVersionDate << endl;
 	cout << "                                      " << endl;
@@ -156,7 +156,7 @@ int main(int argc, char* argv[]) {
 	cout << "Setup OpenCL devices:" << endl;
 	cout << "=====================" << endl;
 	
-	myClHost.setup(&myStratum, devices, fbeamHashI, force3G);
+	myClHost.setup(&myStratum, devices);
 
 	cout << endl;
 	cout << "Waiting for work from stratum:" << endl;

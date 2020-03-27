@@ -1,7 +1,7 @@
 // BEAM OpenCL Miner
 // Stratum interface class
-// Copyright 2018 The Beam Team	
-// Copyright 2018 Wilke Trei
+// Copyright 2020 The Beam Team	
+// Copyright 2020 Wilke Trei
 
 #include <iostream>
 #include <thread>
@@ -24,6 +24,11 @@
 #include "core/difficulty.h"
 #include "core/uintBig.h"
 
+#include "beamUtil.h"
+
+#ifndef beamStratum_H 
+#define beamStratum_H 
+
 using namespace std;
 using namespace boost::asio;
 using boost::asio::ip::tcp;
@@ -31,8 +36,6 @@ namespace pt = boost::property_tree;
 
 namespace beamMiner {
 
-#ifndef beamMiner_H 
-#define beamMiner_H 
 
 class beamStratum {
 	private:
@@ -57,6 +60,8 @@ class beamStratum {
 	std::atomic<uint64_t> nonce;
 	beam::Difficulty powDiff;
 	std::vector<uint8_t> poolNonce;
+	uint8_t extraNonce[4] = {0};
+
 	// Stat
 	uint64_t sharesAcc = 0;
 	uint64_t sharesRej = 0;
@@ -81,6 +86,8 @@ class beamStratum {
 	bool verifyCertificate(bool,boost::asio::ssl::verify_context& );
 
 	// Solution Check & Submit
+	std::vector<uint8_t> packBeamIII(std::vector<uint32_t> &);
+	void Blake2B_BeamIII(WorkDescription *);
 	static bool testSolution(const beam::Difficulty&, const std::vector<uint32_t>&, std::vector<uint8_t>&);
 	void submitSolution(int64_t, uint64_t, const std::vector<uint8_t>&);
 
@@ -92,22 +99,16 @@ class beamStratum {
 	beamStratum(string, string, string, bool);
 	void startWorking();
 
-	struct WorkDescription
-	{
-		bool forceBeamHashI;
-		int64_t workId;
-		uint64_t nonce;
-		beam::Difficulty powDiff;
-	};
-
 	bool hasWork();
-	void getWork(WorkDescription&, uint8_t*);
+	void getWork(WorkDescription&, solverType*);
 
 	void handleSolution(const WorkDescription&, std::vector<uint32_t>&);
 	
 };
 
+}
+
 #endif 
 
-}
+
 
