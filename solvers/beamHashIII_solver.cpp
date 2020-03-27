@@ -24,7 +24,7 @@ void beamHashIII_S::loadAndCompileKernel(cl::Context &context, cl::Device &devic
 	// Building the program for the device
 	cl::Program program(context, source);
 	cl_int err;
-	err = program.build(devicesTMP,"");
+	err = program.build(devicesTMP,"-DwgSize=256");
 
 	// Create the Kernels
 	kernels[index].push_back(cl::Kernel(program, "cleanUp", &err));
@@ -64,14 +64,15 @@ void beamHashIII_S::queueKernels(cl::CommandQueue * queue, uint32_t devInd,  cl:
 		err = kernels[devInd][kInd].setArg(4, prePow); 
 	}
 	
+	uint32_t  wgSize = 256;
 
-	queue->enqueueNDRangeKernel(kernels[devInd][0], cl::NDRange(0), cl::NDRange(5120), cl::NDRange(256), NULL, NULL);	// cleanUp
-	queue->enqueueNDRangeKernel(kernels[devInd][1], cl::NDRange(0), cl::NDRange(33554432), cl::NDRange(256), NULL, NULL);	// seed
-	queue->enqueueNDRangeKernel(kernels[devInd][2], cl::NDRange(0), cl::NDRange(16384*256), cl::NDRange(256), NULL, NULL);	// Round 1
-	queue->enqueueNDRangeKernel(kernels[devInd][3], cl::NDRange(0), cl::NDRange(16384*256), cl::NDRange(256), NULL, NULL);	// Round 2
-	queue->enqueueNDRangeKernel(kernels[devInd][4], cl::NDRange(0), cl::NDRange(16384*256), cl::NDRange(256), NULL, NULL);	// Round 3
-	queue->enqueueNDRangeKernel(kernels[devInd][5], cl::NDRange(0), cl::NDRange(16384*256), cl::NDRange(256), NULL, NULL);	// Round 4
-	queue->enqueueNDRangeKernel(kernels[devInd][6], cl::NDRange(0), cl::NDRange(16384*256), cl::NDRange(256), NULL, NULL);	// Round 5
+	queue->enqueueNDRangeKernel(kernels[devInd][0], cl::NDRange(0), cl::NDRange(5120), cl::NDRange(wgSize), NULL, NULL);	// cleanUp
+	queue->enqueueNDRangeKernel(kernels[devInd][1], cl::NDRange(0), cl::NDRange(33554432), cl::NDRange(wgSize), NULL, NULL);	// seed
+	queue->enqueueNDRangeKernel(kernels[devInd][2], cl::NDRange(0), cl::NDRange(16384*wgSize), cl::NDRange(wgSize), NULL, NULL);	// Round 1
+	queue->enqueueNDRangeKernel(kernels[devInd][3], cl::NDRange(0), cl::NDRange(16384*wgSize), cl::NDRange(wgSize), NULL, NULL);	// Round 2
+	queue->enqueueNDRangeKernel(kernels[devInd][4], cl::NDRange(0), cl::NDRange(16384*wgSize), cl::NDRange(wgSize), NULL, NULL);	// Round 3
+	queue->enqueueNDRangeKernel(kernels[devInd][5], cl::NDRange(0), cl::NDRange(16384*wgSize), cl::NDRange(wgSize), NULL, NULL);	// Round 4
+	queue->enqueueNDRangeKernel(kernels[devInd][6], cl::NDRange(0), cl::NDRange(16384*wgSize), cl::NDRange(wgSize), NULL, NULL);	// Round 5
 
 	results[devInd] = (uint32_t *) queue->enqueueMapBuffer(buffers[devInd][3], CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint4) * 81, NULL, cbEvent, NULL);	// Read the Results
 }

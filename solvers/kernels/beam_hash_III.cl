@@ -1,5 +1,9 @@
 #define bucketSize 8720 
 
+#ifndef wgSize 
+#define wgSize 256
+#endif
+
 #define SIPROUND 				\
     v0 += v1; v2 += v3; 			\
     v1 = rotate(v1, 13UL); 			\
@@ -61,7 +65,7 @@ ulong8 shift56(ulong8 input) {
 /*
 	Kernel Clearing all counters
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void cleanUp(	__global ulong8 * buffer0,
 			__global ulong8 * buffer1,
 			__global uint4 * counters,
@@ -80,7 +84,7 @@ __kernel void cleanUp(	__global ulong8 * buffer0,
 	Kernel for round 0 (seed)
 	Writing to buffer0
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_seed (__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -122,7 +126,7 @@ __kernel void beamHashIII_seed (__global ulong8 * buffer0,
 	Reading from buffer0
 	Writing to buffer1
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_R1 (	__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -215,7 +219,7 @@ __kernel void beamHashIII_R1 (	__global ulong8 * buffer0,
 	Reading from buffer1
 	Writing to buffer0
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_R2 (	__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -318,7 +322,7 @@ __kernel void beamHashIII_R2 (	__global ulong8 * buffer0,
 	Reading from buffer0
 	Writing to buffer1
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_R3 (	__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -434,7 +438,7 @@ __kernel void beamHashIII_R3 (	__global ulong8 * buffer0,
 	Reading from buffer1
 	Writing to buffer0
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_R4 (	__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -554,7 +558,7 @@ __kernel void beamHashIII_R4 (	__global ulong8 * buffer0,
 	Reading from buffer0
 	Writing results
 */
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void beamHashIII_R5 (	__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,
@@ -646,7 +650,7 @@ __kernel void beamHashIII_R5 (	__global ulong8 * buffer0,
 	} 
 }
 
-__attribute__((reqd_work_group_size(256, 1, 1)))
+__attribute__((reqd_work_group_size(wgSize, 1, 1)))
 __kernel void watch_counter    (__global ulong8 * buffer0,
 				__global ulong8 * buffer1,
 				__global uint * counters,

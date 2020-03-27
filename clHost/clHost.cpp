@@ -251,7 +251,7 @@ void clHost::startMining() {
 		if (devices.size() > 1) cout << "| Total: " << setprecision(2) << (double) totalSols / 15.0 << " sol/s ";
 		cout << endl;
 
-		/* 
+		
 
 		// Check if there are paused devices and restart them
 		for (int i=0; i<devices.size(); i++) {
@@ -259,14 +259,29 @@ void clHost::startMining() {
 				paused[i] = false;
 				
 				// Same as above
-				queueKernels(i, &currentWork[i]);
+				solverType nextSolver;
+				stratum->getWork(currentWork[i].wd, &nextSolver);
 
-				results[i] = (unsigned *) queues[i].enqueueMapBuffer(buffers[i][6], CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint4) * 81, NULL, &events[i], NULL);
+				beamSolver * activeSolver;		
+				switch (nextSolver) {
+					case BeamIII:
+						activeSolver = &BeamHashIII;
+						break;
+
+					case None: 
+						paused[i] = true;
+						break;
+				}
+
+				currentWork[i].currentSolver = nextSolver;
+
+				activeSolver->createBuffers(contexts[deviceContext[i]], devices[i], i);
+				activeSolver->queueKernels(&queues[i], i, &events[i], &currentWork[i]);
 				events[i].setCallback(CL_COMPLETE, &CCallbackFunc, (void*) &currentWork[i]);
 				queues[i].flush();
 			}
 
-		} */
+		} 
 	} 
 }
 
