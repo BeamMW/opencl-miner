@@ -190,6 +190,10 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 							if (jsonTree.count("forkheight") > 0) {
 								forkHeight = jsonTree.get<uint64_t>("forkheight");
 							}
+
+							if (jsonTree.count("forkheight2") > 0) {
+								forkHeight2 = jsonTree.get<uint64_t>("forkheight2");
+							}
 						} else {
 							cout << "Error: Login at node not accepted. Closing miner." << endl;
 							exit(0);
@@ -306,8 +310,19 @@ void beamStratum::getWork(WorkDescription& wd, solverType * solver) {
 
 	uint64_t limit = numeric_limits<uint64_t>::max();
 	//wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
-	*solver = BeamIII;
-	wd.solver = BeamIII;
+
+	solverType thisSolver;
+	if (forcedSolver != None) {
+		thisSolver = forcedSolver;
+	} else if ((blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight)) {
+		thisSolver = BeamI;
+	} else if ((blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight) && (blockHeight < forkHeight2)) {
+		thisSolver = BeamII;
+	} else {
+		thisSolver = BeamIII;
+	}
+		
+	*solver = thisSolver;
 	
 	memcpy(wd.work, serverWork.data(), 32);
 
