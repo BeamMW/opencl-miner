@@ -48,6 +48,8 @@ class clHost {
 	// The connector
 	beamStratum* stratum;
 
+	beamHashI_S   BeamHashI;
+	beamHashII_S  BeamHashII;
 	beamHashIII_S BeamHashIII;
 
 	public:

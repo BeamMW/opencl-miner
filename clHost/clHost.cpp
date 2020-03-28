@@ -119,6 +119,8 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 		exit(0);
 	}
 
+	BeamHashI.setup(devices, contexts, deviceContext);
+	BeamHashII.setup(devices, contexts, deviceContext);
 	BeamHashIII.setup(devices, contexts, deviceContext);
 }
 
@@ -138,6 +140,14 @@ void clHost::callbackFunc(cl_int err , void* data){
 
 	beamSolver * activeSolver;
 	switch (workInfo->currentSolver) {
+		case BeamI:
+			activeSolver = &BeamHashI;
+			break;
+
+		case BeamII:
+			activeSolver = &BeamHashII;
+			break;
+
 		case BeamIII:
 			activeSolver = &BeamHashIII;
 			break;
@@ -178,6 +188,14 @@ void clHost::callbackFunc(cl_int err , void* data){
 			workInfo->currentSolver = nextSolver;
 
 			switch (workInfo->currentSolver) {
+				case BeamI:
+					activeSolver = &BeamHashI;
+					break;
+
+				case BeamII:
+					activeSolver = &BeamHashII;
+					break;
+
 				case BeamIII:
 					activeSolver = &BeamHashIII;
 					break;
@@ -194,6 +212,7 @@ void clHost::callbackFunc(cl_int err , void* data){
 		events[gpu].setCallback(CL_COMPLETE, &CCallbackFunc, (void*) &currentWork[gpu]);
 		queues[gpu].flush();
 	} else {
+		activeSolver->stop(gpu); 
 		paused[gpu] = true;
 		cout << "Device will be paused, waiting for new work" << endl;
 	}
@@ -215,6 +234,14 @@ void clHost::startMining() {
 
 		beamSolver * activeSolver;		
 		switch (nextSolver) {
+			case BeamI:
+				activeSolver = &BeamHashI;
+				break;
+
+			case BeamII:
+				activeSolver = &BeamHashII;
+				break;
+
 			case BeamIII:
 				activeSolver = &BeamHashIII;
 				break;
@@ -264,6 +291,14 @@ void clHost::startMining() {
 
 				beamSolver * activeSolver;		
 				switch (nextSolver) {
+					case BeamI:
+						activeSolver = &BeamHashI;
+						break;
+
+					case BeamII:
+						activeSolver = &BeamHashII;
+						break;
+
 					case BeamIII:
 						activeSolver = &BeamHashIII;
 						break;

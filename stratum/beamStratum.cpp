@@ -233,7 +233,7 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					// Block Height for fork detection
 					if (jsonTree.count("height") > 0) {
 						blockHeight = jsonTree.get<uint64_t>("height");
-						if (blockHeight == forkHeight) cout << "-= PoW fork height reached. Switching algorithm =-" << endl;
+						if ((blockHeight == forkHeight) || (blockHeight == forkHeight2)) cout << endl << "-= PoW fork height reached. Switching algorithm =-" << endl << endl;
 					}
 
 
@@ -310,23 +310,24 @@ void beamStratum::getWork(WorkDescription& wd, solverType * solver) {
 
 	uint64_t limit = numeric_limits<uint64_t>::max();
 	//wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
-
+	
 	solverType thisSolver;
 	if (forcedSolver != None) {
 		thisSolver = forcedSolver;
 	} else if ((blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight)) {
 		thisSolver = BeamI;
-	} else if ((blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight) && (blockHeight < forkHeight2)) {
+	} else if ((blockHeight < limit) && (forkHeight < limit) && (blockHeight >= forkHeight) && (blockHeight < forkHeight2)) {
 		thisSolver = BeamII;
 	} else {
 		thisSolver = BeamIII;
 	}
 		
 	*solver = thisSolver;
+	wd.solver = thisSolver;
 	
 	memcpy(wd.work, serverWork.data(), 32);
 
-	if (*solver = BeamIII) {
+	if (*solver == BeamIII) {
 		Blake2B_BeamIII(&wd);
 	}
 

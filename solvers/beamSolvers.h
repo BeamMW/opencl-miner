@@ -66,6 +66,25 @@ class beamSolver {
 	}
 };
 
+class beamHashI_S : public beamSolver {
+	private:
+	void loadAndCompileKernel(cl::Context &, cl::Device &, uint32_t);
+
+	public:
+	void createBuffers(cl::Context &, cl::Device &, uint32_t);
+	void queueKernels(cl::CommandQueue *, uint32_t,  cl::Event *, clCallbackData *);
+	void unmapResult(uint32_t);
+};
+
+class beamHashII_S : public beamSolver {
+	private:
+	void loadAndCompileKernel(cl::Context &, cl::Device &, uint32_t);
+
+	public:
+	void createBuffers(cl::Context &, cl::Device &, uint32_t);
+	void queueKernels(cl::CommandQueue *, uint32_t,  cl::Event *, clCallbackData *);
+	void unmapResult(uint32_t);
+};
 
 class beamHashIII_S : public beamSolver {
 	private:
@@ -76,6 +95,8 @@ class beamHashIII_S : public beamSolver {
 	void queueKernels(cl::CommandQueue *, uint32_t,  cl::Event *, clCallbackData *);
 	void unmapResult(uint32_t);
 };
+
+
 
 }
 

@@ -72,6 +72,7 @@ add_executable(${TARGET_NAME} ${MINER_SRC} ${HEADERS}  )
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/beam)
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHeaders)
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/clHost)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/solvers)
 
 add_subdirectory(solvers)
 target_link_libraries(${TARGET_NAME} solvers)
