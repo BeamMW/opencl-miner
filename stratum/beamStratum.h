@@ -9,6 +9,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <bitset>
+#include <limits>
 #include <deque>
 #include <random>
 
