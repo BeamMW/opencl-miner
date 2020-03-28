@@ -95,9 +95,9 @@ class beamStratum {
 
 	// Fork Information
 	solverType forcedSolver = None;
-	uint64_t blockHeight = numeric_limits<uint64_t>::max();
-	uint64_t forkHeight  = numeric_limits<uint64_t>::max();
-	uint64_t forkHeight2 = numeric_limits<uint64_t>::max();
+	uint64_t blockHeight = std::numeric_limits<unsigned long>::max();
+	uint64_t forkHeight  = std::numeric_limits<unsigned long>::max();
+	uint64_t forkHeight2 = std::numeric_limits<unsigned long>::max();
 
 	public:
 	beamStratum(string, string, string, bool);
