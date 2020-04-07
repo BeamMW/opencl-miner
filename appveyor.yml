@@ -1,7 +1,6 @@
 version: '{build}'
 image: Visual Studio 2017
 
-
 environment:
   BOOST_ROOT: C:\Libraries\boost_1_67_0
   #OPENSSL_ROOT_DIR: c:\beam-libs\openssl
@@ -62,9 +61,9 @@ artifacts:
 deploy:
   provider: S3
   access_key_id:
-    secure: J8+/d4TSbhxiaFlDQopFzKbfLPvUy1rMUJlAgnfbBNE=
+    secure: c7t4F6CxylXQf77OIgif/9mJzb7b0VMWg+Jtpe14dmY=
   secret_access_key:
-    secure: sqF9zdsuUm/k9QzY46s250MZJamHjKrwBCAPbinBA/iOJlgLsHC7lq1F5pTr/B+U
+    secure: 2hi98QLQZulcRMk40ODSwKfGnIUaHGbqkHcyUutpe742XWZilKix4ZmZ3fRePe1A
   bucket: builds.beam.mw
   region: us-west-2
   unzip: false
