@@ -1,6 +1,7 @@
 version: '{build}'
 image: Visual Studio 2017
 
+
 environment:
   BOOST_ROOT: C:\Libraries\boost_1_67_0
   #OPENSSL_ROOT_DIR: c:\beam-libs\openssl
