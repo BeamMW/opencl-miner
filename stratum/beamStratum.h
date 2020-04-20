@@ -100,7 +100,7 @@ class beamStratum {
 	uint64_t forkHeight2 = ~((uint64_t) 0);
 
 	public:
-	beamStratum(string, string, string, bool);
+	beamStratum(string, string, string, bool, solverType);
 	void startWorking();
 
 	bool hasWork();

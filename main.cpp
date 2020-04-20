@@ -5,10 +5,11 @@
 
 #include "beamStratum.h"
 #include "clHost.h"
+#include "beamUtil.h"
 
 // Defining global variables
 const string StrVersionNumber = "v2.0";
-const string StrVersionDate = "Mar 25th 2020";
+const string StrVersionDate = "April 20th 2020";
 
 inline vector<string> &split(const string &s, char delim, vector<string> &elems) {
     stringstream ss(s);
@@ -25,7 +26,7 @@ inline vector<string> split(const string &s, char delim) {
     return split(s, delim, elems);
 }
 
-uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, bool &beamHashI, vector<int32_t> &devices, bool &force3G ) {
+uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiCred, bool &debug, beamMiner::solverType &forcedSolver, vector<int32_t> &devices) {
 	bool hostSet = false;
 	bool apiSet = false;
 	
@@ -66,13 +67,17 @@ uint32_t cmdParser(vector<string> args, string &host, string &port, string &apiC
 					continue;
 				}
 			}
-
-			if (args[i].compare("--force3G")  == 0) {
-				force3G = true;
+			
+			if (args[i].compare("--beamHashI")  == 0) {
+				forcedSolver = beamMiner::BeamI;
 			}
 
-			if (args[i].compare("--beamHashI")  == 0) {
-				beamHashI = true;
+			if (args[i].compare("--beamHashII")  == 0) {
+				forcedSolver = beamMiner::BeamII;
+			}
+
+			if (args[i].compare("--beamHashIII")  == 0) {
+				forcedSolver = beamMiner::BeamIII;
 			}
 
 			if (args[i].compare("--debug")  == 0) {
@@ -105,12 +110,12 @@ int main(int argc, char* argv[]) {
 	string port;
 	string apiCred;
 	bool debug = false;
-	bool fbeamHashI = false;
+	beamMiner::solverType forcedSolver = beamMiner::None;
 	bool useTLS = true;
 	vector<int32_t> devices;
-	bool force3G = false;
 
-	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, fbeamHashI, devices, force3G);
+
+	uint32_t parsing = cmdParser(cmdLineArgs, host, port, apiCred, debug, forcedSolver, devices);
 
 	cout << "-====================================-" << endl;
 	cout << "                                      " << endl;
@@ -123,8 +128,6 @@ int main(int argc, char* argv[]) {
 	cout << "Parameters: " << endl;
 	cout << " --server:      " << host << ":" << port << endl;	
 	cout << " --key:         " << apiCred << endl;
-	cout << " --beamHashI:   " << std::boolalpha << fbeamHashI << endl;
-	cout << " --force3G:     " << std::boolalpha << force3G << endl;	
 	cout << " --debug:       " << std::boolalpha << debug << endl;
 
 	if (parsing != 0) {
@@ -141,14 +144,15 @@ int main(int argc, char* argv[]) {
 		cout << " --server <server>:<port>	The BEAM stratum server and port to connect to (required)" << endl;
 		cout << " --key <key>			The BEAM stratum server API key (required), on a Beam mining pool the user name / wallet addres" << endl;
 		cout << " --devices <numbers>		A comma seperated list of devices that should be used for mining (default: all in system)" << endl; 
-		cout << " --beamHashI			Force mining BeamHash I (pre fork)" << endl;
-		cout << " --debug			Enable debug mode - verbose information will be displayed" << endl;
-		cout << " --force3G			Force miner to use max 3G for all installed GPUs" << endl;
+		cout << " --beamHashI			Force mining Beam Hash I" << endl;
+		cout << " --beamHashII			Force mining Beam Hash II" << endl;
+		cout << " --beamHashIII			Force mining Beam Hash III" << endl;
+		cout << " --debug			Enable debug mode - verbose stratum information will be displayed" << endl;
 		cout << " --version			Prints the version number" << endl;
 		exit(0);
 	}
 
-	beamMiner::beamStratum myStratum(host, port, apiCred, debug);
+	beamMiner::beamStratum myStratum(host, port, apiCred, debug, forcedSolver);
 
 	beamMiner::clHost myClHost;
 	

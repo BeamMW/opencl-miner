@@ -524,7 +524,7 @@ void beamStratum::handleSolution(const WorkDescription& wd, vector<uint32_t> &in
 }
 
 
-beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn) : res(io_service), context(boost::asio::ssl::context::tlsv12)  {
+beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool debugIn, solverType forcedIn) : res(io_service), context(boost::asio::ssl::context::tlsv12)  {
 
 	context.set_options(	  boost::asio::ssl::context::default_workarounds
 				| boost::asio::ssl::context::no_sslv2
@@ -536,6 +536,8 @@ beamStratum::beamStratum(string hostIn, string portIn, string apiKeyIn, bool deb
 	port = portIn;
 	apiKey = apiKeyIn;
 	debug = debugIn;
+
+	forcedSolver = forcedIn;
 
 	// Assign the work field and nonce
 	serverWork.assign(32,(uint8_t) 0);
