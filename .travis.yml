@@ -111,7 +111,7 @@ before_script:
 
 after_success:
   # deploy using ftp server
-  - BUILDS_SERVER_PATH=${BUILD_SERVER}/files/$TRAVIS_BRANCH/$(date +%Y.%m.%d)/$BUILD_TYPE/$OS_FOLDER
+  - BUILDS_SERVER_PATH=${BUILD_SERVER}/$TRAVIS_BRANCH/$(date +%Y.%m.%d)/$BUILD_TYPE/$OS_FOLDER
   - tar -cvzf opencl-miner-$BEAM_VERSION.tar.gz --directory=$HOME/build/BeamMW/opencl-miner beam-opencl-miner
 
   # upload binaries to FTP
