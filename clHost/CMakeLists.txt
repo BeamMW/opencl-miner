@@ -3,6 +3,7 @@ set(SOURCES
 )
 
 add_library(clHost ${SOURCES})
+target_link_libraries(clHost Boost::boost OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(clHost PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(clHost PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../)
 target_include_directories(clHost PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../beam)
