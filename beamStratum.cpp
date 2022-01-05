@@ -55,6 +55,7 @@ void beamStratum::writeHandler(const boost::system::error_code& err) {
 
 // Called by main() function, starts the stratum client thread
 void beamStratum::startWorking(){
+	t_start = time(NULL);
 	std::thread (&beamStratum::connect,this).detach();
 }
 
@@ -95,7 +96,7 @@ void beamStratum::connect() {
 // Once the physical connection is there start a TLS handshake
 void beamStratum::handleConnect(const boost::system::error_code& err, tcp::resolver::iterator endpoint_iterator) {
 	if (!err) {
-	cout << "Connected to node. Starting TLS handshake." << endl;
+	cout << "Node connection: ok" << endl;
 
       	// The connection was successful. Do the TLS handshake
 	socket->async_handshake(boost::asio::ssl::stream_base::client,boost::bind(&beamStratum::handleHandshake, this, boost::asio::placeholders::error));
@@ -125,7 +126,7 @@ void beamStratum::handleHandshake(const boost::system::error_code& error) {
 		boost::asio::async_read_until(*socket, responseBuffer, "\n",
 		boost::bind(&beamStratum::readStratum, this, boost::asio::placeholders::error));
 
-		cout << "TLS Handshake sucess" << endl;
+		cout << "TLS Handshake:   ok" << endl;
 		
 		// The connection was successful. Send the login request
 		std::stringstream json;
@@ -184,6 +185,10 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 							} else {
 								poolNonce.clear();
 							}
+
+							if (jsonTree.count("forkheight") > 0) {
+								forkHeight = jsonTree.get<uint64_t>("forkheight");
+							}
 						} else {
 							cout << "Error: Login at node not accepted. Closing miner." << endl;
 							exit(0);
@@ -191,9 +196,11 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					} else {	// A share reply
 						int32_t code = jsonTree.get<int32_t>("code");
 						if (code == 1) {
-							cout << "Solution for work id " << jsonTree.get<string>("id") << "accepted" << endl;
+							cout << "Solution for work id " << jsonTree.get<string>("id") << " accepted" << endl;
+							sharesAcc++;
 						} else {
-							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << "not accepted" << endl;
+							cout << "Warning: Solution for work id " << jsonTree.get<string>("id") << " rejected" << endl;
+							sharesRej++;
 						}
 					}
 				}
@@ -211,9 +218,24 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					// Get the target difficulty
 					uint32_t stratDiff =  jsonTree.get<uint32_t>("difficulty");
 					powDiff = beam::Difficulty(stratDiff);
+
+					// Nicehash support
+					if (jsonTree.count("nonceprefix") > 0) {
+						string poolNonceStr = jsonTree.get<string>("nonceprefix");
+						poolNonce = parseHex(poolNonceStr);
+					}
+
+					// Block Height for fork detection
+					if (jsonTree.count("height") > 0) {
+						blockHeight = jsonTree.get<uint64_t>("height");
+						if (blockHeight == forkHeight) cout << "-= PoW fork height reached. Switching algorithm =-" << endl;
+					}
+
+
 					updateMutex.unlock();	
 
-					cout << "New work received with id " << workId << " at difficulty " << powDiff.ToFloat() << endl;	
+					cout << "New job: " << workId << "  Difficulty: " << std::fixed << std::setprecision(0) << powDiff.ToFloat() << endl;
+					cout << "Solutions (Accepted/Rejected): " << sharesAcc << " / " << sharesRej << " Uptime: " << (int)(t_current-t_start) << " sec" << endl; 	
 				}
 
 				// Cancel a running job
@@ -225,12 +247,13 @@ void beamStratum::readStratum(const boost::system::error_code& err) {
 					if (id == workId) workId = -1;
 					updateMutex.unlock();
 				}
+				t_current = time(NULL);
 			}
 
 			
 
 		} catch(const pt::ptree_error &e) {
-			cout << "Json parse error: " << e.what() << endl; 
+			cout << "Json parse error when reading Stratum node: " << e.what() << endl; 
 		}
 
 		// Prepare to continue reading
@@ -265,6 +288,10 @@ void beamStratum::getWork(WorkDescription& wd, uint8_t* dataOut) {
 
 	wd.workId = workId;
 	wd.powDiff = powDiff;
+
+	uint64_t limit = numeric_limits<uint64_t>::max();
+	wd.forceBeamHashI = (blockHeight < limit) && (forkHeight < limit) && (blockHeight < forkHeight);
+
 	memcpy(dataOut, serverWork.data(), 32);
 
 	updateMutex.unlock();

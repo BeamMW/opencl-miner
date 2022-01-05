@@ -57,6 +57,10 @@ class beamStratum {
 	std::atomic<uint64_t> nonce;
 	beam::Difficulty powDiff;
 	std::vector<uint8_t> poolNonce;
+	// Stat
+	uint64_t sharesAcc = 0;
+	uint64_t sharesRej = 0;
+	time_t t_start, t_current;
 
 	//Stratum sending subsystem
 	bool activeWrite = false;
@@ -80,12 +84,17 @@ class beamStratum {
 	static bool testSolution(const beam::Difficulty&, const std::vector<uint32_t>&, std::vector<uint8_t>&);
 	void submitSolution(int64_t, uint64_t, const std::vector<uint8_t>&);
 
+	// Fork Information
+	uint64_t blockHeight = numeric_limits<uint64_t>::max();
+	uint64_t forkHeight = numeric_limits<uint64_t>::max();
+
 	public:
 	beamStratum(string, string, string, bool);
 	void startWorking();
 
 	struct WorkDescription
 	{
+		bool forceBeamHashI;
 		int64_t workId;
 		uint64_t nonce;
 		beam::Difficulty powDiff;

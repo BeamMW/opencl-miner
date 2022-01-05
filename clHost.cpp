@@ -4,6 +4,7 @@
 // Copyright 2018 Wilke Trei
 
 #include "clHost.h"
+#include "./kernels/beamHash.h"
 
 namespace beamMiner {
 
@@ -48,23 +49,13 @@ void CL_CALLBACK CCallbackFunc(cl_event ev, cl_int err , void* data) {
 
 // Function to load the OpenCL kernel and prepare our device for mining
 void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
-	cout << "   Loading and compiling Beam OpenCL Kernel" << endl;
+	cout << "          Beam OpenCL kernel: loading & compiling" << endl;
 
-	// reading the kernel file
-	string kernelFileName;
-	if (use3G) {
-		kernelFileName = "./equihash_150_5_3G.cl";
-	} else {
-		kernelFileName = "./equihash_150_5.cl";
-	}
-	cl_int err;
-	ifstream file(kernelFileName.c_str());
-	if (!file.is_open()) {
-		cout << "Error: Kernel file not found!" << endl;
-		exit(0);	
-	}
+	// reading the kernel
+	string progStr = string((const char*) __beamHash_cl, __beamHash_cl_len); 
 
-	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>()));
+	/* ifstream file("./kernels/equihash_150_5.cl");
+	string progStr(istreambuf_iterator<char>(file),(istreambuf_iterator<char>())); */
 	cl::Program::Sources source(1,std::make_pair(progStr.c_str(), progStr.length()+1));
 
 	// Create a program object and build it
@@ -72,11 +63,16 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 	devicesTMP.push_back(device);
 
 	cl::Program program(contexts[pl], source);
-	err = program.build(devicesTMP,"");
+	cl_int err;
+	if (!use3G) {
+		err = program.build(devicesTMP,"");
+	} else {
+		err = program.build(devicesTMP,"-DMEM3G");
+	}
 
 	// Check if the build was Ok
 	if (!err) {
-		cout << "   Build sucessfull. " << endl;
+		cout << "          Beam OpenCL kernel: build sucessfully" << endl;
 
 		// Store the device and create a queue for it
 		cl_command_queue_properties queue_prop = 0;  
@@ -94,15 +90,23 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 		// Create the kernels
 		vector<cl::Kernel> newKernels;	
 		newKernels.push_back(cl::Kernel(program, "clearCounter", &err));
+
 		newKernels.push_back(cl::Kernel(program, "round0", &err));
 		newKernels.push_back(cl::Kernel(program, "round1", &err));
+
+		newKernels.push_back(cl::Kernel(program, "round0_BH2", &err));
+		newKernels.push_back(cl::Kernel(program, "round1_BH2", &err));
+		
 		newKernels.push_back(cl::Kernel(program, "round2", &err));
 		newKernels.push_back(cl::Kernel(program, "round3", &err));
 		newKernels.push_back(cl::Kernel(program, "round4", &err));
 		newKernels.push_back(cl::Kernel(program, "round5", &err));
-		newKernels.push_back(cl::Kernel(program, "combine", &err));
 		if (use3G) {
+			newKernels.push_back(cl::Kernel(program, "combine3G", &err));
 			newKernels.push_back(cl::Kernel(program, "repack", &err));
+			newKernels.push_back(cl::Kernel(program, "move", &err));
+		} else {
+			newKernels.push_back(cl::Kernel(program, "combine", &err));
 		}
 		kernels.push_back(newKernels);
 
@@ -115,10 +119,11 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err)); 
 			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint2) * 71303168, NULL, &err)); 
 		} else {
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err));
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 71303168, NULL, &err)); 
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 54263808, NULL, &err)); 
-			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 1, NULL, &err)); 
+
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 69599232, NULL, &err));
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 69599232, NULL, &err)); 
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 52199424, NULL, &err)); 
+			newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint2) * 1, NULL, &err)); 
 		}
 
 		newBuffers.push_back(cl::Buffer(contexts[pl], CL_MEM_READ_WRITE,  sizeof(cl_uint4) * 256, NULL, &err));   
@@ -135,7 +140,7 @@ void clHost::loadAndCompileKernel(cl::Device &device, uint32_t pl, bool use3G) {
 
 
 // Detect the OpenCL hardware on this system
-void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
+void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU, bool force3G) {
 	// read the OpenCL platforms on this system
 	cl::Platform::get(&platforms);  
 
@@ -175,11 +180,14 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 
 			// Check if the device should be selected
 			bool pick = false;
+
 			if (selDev[0] == -1) pick = true;
 			if (selNum < selDev.size()) {
 				if (curDiv == selDev[selNum]) {
 					pick = true;
 					selNum++;
+
+					
 				}				
 			}
 			
@@ -188,22 +196,30 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 				// Check if the CPU / GPU has enough memory
 				uint64_t deviceMemory = nDev[di].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
 				uint64_t needed_4G = 7* ((uint64_t) 570425344) + 4096 + 196608 + 1296;
-				uint64_t needed_3G = 4* ((uint64_t) 570425344) + ((uint64_t) 868220928) + 4096 + 196608 + 1296;
+				uint64_t needed_3G = 4* ((uint64_t) 556793856) + ((uint64_t) 835190784) + 4096 + 196608 + 1296;
 
-				cout << "   Device reports " << deviceMemory / (1024*1024) << "MByte total memory" << endl;
-			
+				cout << "          Total memory: " << deviceMemory / (1024*1024) << " MByte" << endl;
+				
+				if ( hasExtension(nDev[di], "cl_amd_device_attribute_query") ) {
+					uint64_t freeDeviceMemory;
+				 	nDev[di].getInfo(0x4039, &freeDeviceMemory);  // CL_DEVICE_GLOBAL_FREE_MEMORY_AMD
+					freeDeviceMemory *= 1024;
+					cout << "          Free memory:  " << freeDeviceMemory / (1024*1024) << " MByte" << endl;
+					deviceMemory = min<uint64_t>(deviceMemory, freeDeviceMemory);
+				}
+				
 
-				if (deviceMemory > needed_4G) {
-					cout << "   Memory check for 4G kernel passed" << endl;
+				if ((deviceMemory > needed_4G) && (!force3G)) {
+					cout << "          Beam OpenCL kernel: using 4 Gbyte" << endl;
 					loadAndCompileKernel(nDev[di], pl, false);
-				} /*else if (deviceMemory > needed_3G) {
-					cout << "   Memory check for 3G kernel passed" << endl;
+				} else if (deviceMemory > needed_3G) {
+					cout << "          Beam OpenCL kernel: using 3 Gbyte" << endl;
 					loadAndCompileKernel(nDev[di], pl, true);
-				} */ else {
-					cout << "   Memory check failed, required minimum memory: " << needed_4G/(1024*1024) << endl;
+				}  else {
+					cout << "   Memory check failed, required minimum memory: " << needed_3G/(1024*1024) << endl;
 				}
 			} else {
-				cout << "   Device will not be used, it was not included in --devices parameter." << endl;
+				cout << "          Device not used. Not included in --devices parameter." << endl;
 			}
 
 			curDiv++; 
@@ -218,9 +234,10 @@ void clHost::detectPlatFormDevices(vector<int32_t> selDev, bool allowCPU) {
 
 
 // Setup function called from outside
-void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool allowCPU) {
+void clHost::setup(beamStratum* stratumIn, vector<int32_t> devSel,  bool _beamHashI, bool force3G) {
 	stratum = stratumIn;
-	detectPlatFormDevices(devSel, allowCPU);
+	fbeamHashI = _beamHashI;
+	detectPlatFormDevices(devSel, false, force3G);
 }
 
 
@@ -252,46 +269,66 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][2].setArg(3, buffers[gpuIndex][3]); 	// Index tree will be stored here
 		kernels[gpuIndex][2].setArg(4, buffers[gpuIndex][5]); 
 
-		// Kernel arguments for round2
-		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		// Kernel arguments for round0-BH2
+		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][2]); 
 		kernels[gpuIndex][3].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][3].setArg(3, work); 
+		kernels[gpuIndex][3].setArg(4, nonce); 
+
+		// Kernel arguments for round1-BH2
+		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][4].setArg(3, buffers[gpuIndex][3]); 	// Index tree will be stored here
+		kernels[gpuIndex][4].setArg(4, buffers[gpuIndex][5]); 
+
+		// Kernel arguments for round2
+		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for round3
-		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
-		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
+		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]); 
 
 		// Kernel arguments for round4
-		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][2]); 	// Index tree will be stored here 
-		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][2]); 	// Index tree will be stored here 
+		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for round5
-		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
-		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
+		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for Combine
-		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][1]); 	
-		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][7].setArg(3, buffers[gpuIndex][3]); 	
-		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][4]); 
-		kernels[gpuIndex][7].setArg(5, buffers[gpuIndex][5]); 	
-		kernels[gpuIndex][7].setArg(6, buffers[gpuIndex][6]);
+		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][1]); 	
+		kernels[gpuIndex][9].setArg(2, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][9].setArg(3, buffers[gpuIndex][3]); 	
+		kernels[gpuIndex][9].setArg(4, buffers[gpuIndex][4]); 
+		kernels[gpuIndex][9].setArg(5, buffers[gpuIndex][5]); 	
+		kernels[gpuIndex][9].setArg(6, buffers[gpuIndex][6]);
 
 		cl_int err;
 		// Queue the kernels
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][0], cl::NDRange(0), cl::NDRange(12288), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+
+		if (fbeamHashI || workData->wd.forceBeamHashI) {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		} else {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(2796032), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(2097152), cl::NDRange(256), NULL, NULL);
+		}
 		queues[gpuIndex].flush();
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][5], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][6], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL);
 	} else {	// Starting the 3G kernels
 		// Kernel arguments for cleanCounter
 		kernels[gpuIndex][0].setArg(0, buffers[gpuIndex][5]); 
@@ -304,65 +341,90 @@ void clHost::queueKernels(uint32_t gpuIndex, clCallbackData* workData) {
 		kernels[gpuIndex][1].setArg(3, nonce); 
 		kernels[gpuIndex][1].setArg(4, (cl_uint) 0); 
 
-		// Kernel arguments for round1
+		 // Kernel arguments for round1
 		kernels[gpuIndex][2].setArg(0, buffers[gpuIndex][0]); 
 		kernels[gpuIndex][2].setArg(1, buffers[gpuIndex][1]); 
 		kernels[gpuIndex][2].setArg(2, buffers[gpuIndex][2]);  // Index tree will be stored here 
 		kernels[gpuIndex][2].setArg(3, buffers[gpuIndex][5]); 
 		kernels[gpuIndex][2].setArg(4, (cl_uint) 0); 
 
+		// Kernel arguments for round0-BH2
+		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][3].setArg(2, work); 
+		kernels[gpuIndex][3].setArg(3, nonce); 
+		kernels[gpuIndex][3].setArg(4, (cl_uint) 0); 
+
+		 // Kernel arguments for round1-BH2
+		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][2]);  // Index tree will be stored here 
+		kernels[gpuIndex][4].setArg(3, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][4].setArg(4, (cl_uint) 0); 
+
 		// Kernel arguments for round2
-		kernels[gpuIndex][3].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][3].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
-		kernels[gpuIndex][3].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]);	// Index tree will be stored here 
+		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]); 
+
+		// Kernel arguments for move
+		kernels[gpuIndex][11].setArg(0, buffers[gpuIndex][2]); 
+		kernels[gpuIndex][11].setArg(1, buffers[gpuIndex][1]); 	
 
 		// Kernel arguments for repack
-		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][2]); 
-		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][0]);
-		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][2]);	// Index tree R1 & 2 will be packed here 
+		kernels[gpuIndex][10].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][10].setArg(1, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][10].setArg(2, buffers[gpuIndex][2]); 	// Index tree will be stored here 	
 
 		// Kernel arguments for round3
-		kernels[gpuIndex][4].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][4].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
-		kernels[gpuIndex][4].setArg(2, buffers[gpuIndex][5]); 
+		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][1]); 	// Index tree will be stored here 
+		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]); 
 
-		 // Kernel arguments for round4
-		kernels[gpuIndex][5].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][5].setArg(1, buffers[gpuIndex][0]); 	// Index tree will be stored here 
-		kernels[gpuIndex][5].setArg(2, buffers[gpuIndex][5]);  
+		// Kernel arguments for round4
+		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][0]); 	// Index tree will be stored here 
+		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for round5
-		kernels[gpuIndex][6].setArg(0, buffers[gpuIndex][0]); 
-		kernels[gpuIndex][6].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
-		kernels[gpuIndex][6].setArg(2, buffers[gpuIndex][5]);  
+		kernels[gpuIndex][8].setArg(0, buffers[gpuIndex][0]); 
+		kernels[gpuIndex][8].setArg(1, buffers[gpuIndex][4]); 	// Index tree will be stored here 
+		kernels[gpuIndex][8].setArg(2, buffers[gpuIndex][5]);  
 
 		// Kernel arguments for Combine
-		kernels[gpuIndex][7].setArg(0, buffers[gpuIndex][1]); 
-		kernels[gpuIndex][7].setArg(1, buffers[gpuIndex][2]); 	
-		kernels[gpuIndex][7].setArg(2, buffers[gpuIndex][4]); 
-		kernels[gpuIndex][7].setArg(3, buffers[gpuIndex][5]); 	
-		kernels[gpuIndex][7].setArg(4, buffers[gpuIndex][6]); 
+		kernels[gpuIndex][9].setArg(0, buffers[gpuIndex][1]); 
+		kernels[gpuIndex][9].setArg(1, buffers[gpuIndex][2]); 	
+		kernels[gpuIndex][9].setArg(2, buffers[gpuIndex][4]);  
+		kernels[gpuIndex][9].setArg(3, buffers[gpuIndex][5]); 	
+		kernels[gpuIndex][9].setArg(4, buffers[gpuIndex][6]);
 
 		cl_int err;
 		// Queue the kernels
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][0], cl::NDRange(0), cl::NDRange(12288), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
-		queues[gpuIndex].flush();
+
+		if (fbeamHashI || workData->wd.forceBeamHashI) {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
+			queues[gpuIndex].flush();
+			
+			kernels[gpuIndex][1].setArg(4, (cl_uint) 1); 
+			kernels[gpuIndex][2].setArg(4, (cl_uint) 1); 
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(0), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
+		} else {
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(2796032), cl::NDRange(256), NULL, NULL);
+			err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(2097152), cl::NDRange(256), NULL, NULL);
+		}
 		
-		kernels[gpuIndex][1].setArg(4, (cl_uint) 1); 
-		kernels[gpuIndex][2].setArg(4, (cl_uint) 1); 
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][1], cl::NDRange(0), cl::NDRange(22369536), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][2], cl::NDRange(8388608), cl::NDRange(8388608), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][3], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(71041024), cl::NDRange(256), NULL, NULL);
-		queues[gpuIndex].flush();
-		
-		
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][4], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][5], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][11], cl::NDRange(0), cl::NDRange(34799616), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][10], cl::NDRange(0), cl::NDRange(69599232), cl::NDRange(256), NULL, NULL);
+		queues[gpuIndex].flush();
+		
 		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][6], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
-		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL); 
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][7], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][8], cl::NDRange(0), cl::NDRange(16777216), cl::NDRange(256), NULL, NULL);
+		err = queues[gpuIndex].enqueueNDRangeKernel(kernels[gpuIndex][9], cl::NDRange(0), cl::NDRange(4096), cl::NDRange(16), NULL, NULL); 
 	}
 
 	
@@ -376,6 +438,7 @@ void clHost::callbackFunc(cl_int err , void* data){
 
 	// Read the number of solutions of the last iteration
 	uint32_t solutions = results[gpu][0];
+
 	for (uint32_t  i=0; i<solutions; i++) {
 		vector<uint32_t> indexes;
 		indexes.assign(32,0);
@@ -427,11 +490,11 @@ void clHost::startMining() {
 			uint32_t sol = solutionCnt[i];
 			solutionCnt[i] = 0;
 			totalSols += sol;
-			cout << fixed << setprecision(2) << (double) sol / 15.0 << " sol/s ";			
+			cout << fixed << setprecision(2) << (double) sol / 15.0 << " sol/s ";
 			
 		}
-		
-		if (devices.size() > 1) cout << "| Total: " << setprecision(2) << (double) totalSols / 15.0 << " sol/s ";	
+
+		if (devices.size() > 1) cout << "| Total: " << setprecision(2) << (double) totalSols / 15.0 << " sol/s ";
 		cout << endl;
 
 		// Check if there are paused devices and restart them

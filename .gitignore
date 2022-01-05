@@ -2,5 +2,14 @@
 *.lib
 *.a
 makefile
+Makefile
+
 beamMiner
 beamMiner.exe
+
+beam-opencl-miner
+beam-opencl-miner.exe
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
